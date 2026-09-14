@@ -1,18 +1,16 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { useAppKitAccount } from '@reown/appkit/react';
-import StockPassApp from './StockPassApp';
 import Landing from './Landing';
 import './styles.css';
 import './mobile-safety.css';
 import '@solana/wallet-adapter-react-ui/styles.css';
 import './reown';
 
+const StockPassApp = lazy(() => import('./StockPassApp'));
 const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-
-document.getElementById('boot-screen')?.remove();
 
 class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -41,9 +39,30 @@ class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { 
   }
 }
 
+function WorkspaceLoading() {
+  return (
+    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: '#f3f6f9', color: '#101827', fontFamily: 'Manrope, system-ui, sans-serif' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: 42, height: 42, margin: '0 auto 14px', display: 'grid', placeItems: 'center', borderRadius: 12, background: '#101827', color: '#fff', font: '800 11px/1 Manrope, sans-serif' }}>SP</div>
+        <strong style={{ display: 'block', fontSize: 16 }}>Opening StockPass</strong>
+        <span style={{ display: 'block', marginTop: 6, color: '#778598', fontSize: 12 }}>Loading your mainnet workspace…</span>
+      </div>
+    </div>
+  );
+}
+
 function Root() {
   const { isConnected } = useAppKitAccount();
-  return isConnected ? <StockPassApp /> : <Landing />;
+
+  if (!isConnected) {
+    return <Landing />;
+  }
+
+  return (
+    <Suspense fallback={<WorkspaceLoading />}>
+      <StockPassApp />
+    </Suspense>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
