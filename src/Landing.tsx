@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAppKit, useAppKitAccount } from '@reown/appkit/react';
-import { ArrowUpRight, Bell, Check, ChevronRight, CircleDollarSign, Clock3, LineChart, LockKeyhole, Radar, ShieldCheck, Users, WalletCards } from 'lucide-react';
+import { ArrowUpRight, Bell, Check, ChevronRight, CircleDollarSign, LineChart, LockKeyhole, Radar, ShieldCheck, WalletCards } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import './landing.css';
 
