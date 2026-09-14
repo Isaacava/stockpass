@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { useAppKitAccount } from '@reown/appkit/react';
-import App from './App';
+import StockPassApp from './StockPassApp';
 import Landing from './Landing';
 import './styles.css';
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -13,7 +13,7 @@ const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-bet
 
 function Root() {
   const { isConnected } = useAppKitAccount();
-  return isConnected ? <App /> : <Landing />;
+  return isConnected ? <StockPassApp /> : <Landing />;
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
