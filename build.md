@@ -31,6 +31,17 @@ StockPass combines three layers:
 - Original StockPass visual language: signal-console layout, dark navigation rail, blue/cyan evidence accents, compact monospaced metadata, market-signal cards and proof-first interaction patterns.
 - Landing page is the default disconnected experience; the full workspace is lazy-loaded only after a wallet connects so workspace imports cannot block the public landing page.
 
+## Additions from the StockPass additions pack
+
+- `stockpass_telegram_links` database table for wallet → Telegram chat linking.
+- Telegram deep-link client helper.
+- Telegram webhook Edge Function source with webhook-secret validation and Solana-address validation.
+- Scheduled price-alert worker source using Jupiter Price API, in-app activity events and optional Telegram delivery.
+- xStock-scoped portfolio PnL helper using Birdeye's Wallet PnL endpoint.
+- Compact connected-workspace tools panel that exposes Telegram alerts and PnL when the corresponding integrations are configured.
+
+The Telegram migration has been applied to the existing StockPass Supabase project. The Edge Functions are committed to the repository but are not deployed until their required Telegram secrets are configured. The PnL browser helper is optional; for production the Birdeye key should be moved behind an Edge Function rather than exposed to the browser.
+
 ## UX principles
 
 StockPass should feel like a **social market intelligence product**, not a generic crypto dashboard and not a passport/document clone.
@@ -57,7 +68,19 @@ Any supported buy, sell or swap will eventually be a real Solana mainnet transac
 
 The shared Supabase project contains the StockPass-specific `stockpass_*` tables alongside unrelated AgentMarket tables. Do not delete or rewrite the AgentMarket tables.
 
-The StockPass browser client currently uses publishable Supabase credentials. RLS still needs to be enabled with proper wallet-scoped authorization policies before treating the social database as production-secure.
+The StockPass browser client currently uses publishable Supabase credentials. RLS is still disabled on the StockPass-specific tables and must be addressed with wallet-signature authentication and wallet-scoped policies before treating the social database as production-secure.
+
+## Integration setup still required
+
+Telegram delivery requires:
+- a Telegram bot created through BotFather
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_WEBHOOK_SECRET`
+- `VITE_TELEGRAM_BOT_USERNAME`
+- deployed `telegram-webhook` and `alerts-worker` Edge Functions
+- a scheduled worker invocation
+
+PnL requires a Birdeye API key. The current helper uses `VITE_BIRDEYE_API_KEY` for the hackathon path; production should proxy this through a server-side Edge Function.
 
 ## Current next targets
 
@@ -66,6 +89,7 @@ The StockPass browser client currently uses publishable Supabase credentials. RL
 3. Mainnet buy/sell/swap execution with wallet signing and confirmed receipts.
 4. Position-cost basis and realized/unrealized PnL derived from transaction history.
 5. Seller proof for reductions/sells, not just holder proof.
-6. Price-alert evaluation worker and notification delivery.
-7. Milestone-generated post drafts from verified portfolio events.
-8. Judge-flow testing from wallet connection → proof → trade → PnL → post → follow → notification → public proof card.
+6. Deploy and schedule the StockPass alerts worker.
+7. Finish Telegram connection UX and notification settings.
+8. Milestone-generated post drafts from verified portfolio events.
+9. Judge-flow testing from wallet connection → proof → trade → PnL → post → follow → notification → public proof card.
