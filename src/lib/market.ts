@@ -23,7 +23,7 @@ export async function fetchXStockPrices(symbols: string[]) {
   const results = await Promise.allSettled(symbols.map(fetchXStockPrice));
   return Object.fromEntries(
     results
-      .filter((result): result is PromiseFulfilledResult<MarketQuote | null> => result.status === 'fulfilled' && result.value !== null)
+      .filter((result): result is PromiseFulfilledResult<MarketQuote> => result.status === 'fulfilled' && result.value !== null)
       .map((result) => [result.value.symbol, result.value])
   );
 }
@@ -35,7 +35,7 @@ function findNumber(object: Record<string, unknown>, keys: string[]): number | n
     if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
   }
   for (const value of Object.values(object)) {
-    if (value && typeof value === 'object') {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
       const nested = findNumber(value as Record<string, unknown>, keys);
       if (nested !== null) return nested;
     }
