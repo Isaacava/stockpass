@@ -1,15 +1,61 @@
-html,body,#root{width:100%;max-width:100%;overflow-x:hidden}
-.landing-page{width:100%;max-width:100vw;overflow-x:clip}
-.landing-page > *,.landing-page main,.landing-page section,.landing-page header,.landing-page footer{max-width:100%}
-.landing-hero > *,
-.landing-story > *,
-.landing-feature-grid > *,
-.landing-architecture > *,
-.landing-final > *{min-width:0}
-.landing-visual,.proof-window{min-width:0;max-width:100%}
+/* Mobile/layout hardening. This file loads after the main app styles. */
+html,body,#root{width:100%;min-width:0;max-width:100%;margin:0;padding:0;overflow-x:hidden}
+*,*::before,*::after{box-sizing:border-box;min-width:0}
+img,svg,video,canvas{max-width:100%}
+button,input,textarea{max-width:100%}
+.landing-page{position:relative;left:0;right:auto;transform:none;width:100%;min-width:0;max-width:none;margin:0;overflow-x:hidden;overflow-wrap:anywhere}
+.landing-page main,.landing-page header,.landing-page footer,.landing-page section{width:100%;min-width:0;max-width:none}
+.landing-nav,.landing-hero,.landing-marquee,.landing-story,.landing-feature-grid,.landing-architecture,.landing-final,.landing-footer{width:min(100%,1240px);min-width:0;max-width:1240px;margin-left:auto;margin-right:auto}
+.landing-hero>*,.landing-story>*,.landing-feature-grid>*,.landing-architecture>*,.landing-final>*{min-width:0;max-width:100%}
+.landing-visual{width:100%;min-width:0;max-width:100%;overflow:visible}
+.proof-window{width:min(650px,100%);min-width:0;max-width:100%}
+.float-card{max-width:calc(100% - 12px)}
 .arch-node{width:min(310px,100%);max-width:100%}
+@media(max-width:940px){
+  .landing-nav{padding-left:18px;padding-right:18px}
+  .landing-hero{display:block;padding-left:18px;padding-right:18px}
+  .landing-hero-copy{width:100%;max-width:760px;padding-left:0}
+  .landing-visual{margin-top:34px;min-height:0;padding:0 0 46px}
+  .landing-story{display:block;padding-left:18px;padding-right:18px}
+  .story-body{max-width:none;padding-top:22px}
+  .landing-feature-grid{grid-template-columns:1fr;padding-left:18px;padding-right:18px}
+  .landing-feature.feature-wide{grid-column:auto}
+  .landing-architecture{display:block;padding-left:18px;padding-right:18px}
+  .architecture-map{width:100%;max-width:none}
+  .landing-final{display:block;padding-left:18px;padding-right:18px}
+  .landing-final-button{margin-top:24px}
+  .landing-footer{padding-left:18px;padding-right:18px}
+}
 @media(max-width:620px){
-  .landing-hero,.landing-story,.landing-feature-grid,.landing-architecture,.landing-final,.landing-footer{width:100%;max-width:100%;overflow-x:clip}
-  .landing-visual{width:100%;overflow:visible}
-  .proof-window{width:100%}
+  .landing-nav{height:auto;min-height:64px}
+  .landing-nav-cta{white-space:nowrap}
+  .landing-nav-links{display:none}
+  .landing-hero{padding-top:42px;padding-bottom:30px}
+  .landing-hero h1{font-size:clamp(40px,12vw,52px);max-width:100%}
+  .landing-lede{font-size:14px}
+  .landing-actions{display:grid;grid-template-columns:1fr;max-width:100%}
+  .landing-primary,.landing-secondary{width:100%;justify-content:center}
+  .landing-proof-row{grid-template-columns:1fr;width:100%}
+  .landing-proof-row div{border-right:0!important;border-bottom:1px solid var(--line)}
+  .landing-proof-row div:last-child{border-bottom:0}
+  .landing-visual{padding-bottom:58px}
+  .proof-window{padding:15px;border-radius:16px;transform:none!important}
+  .proof-heading strong{font-size:26px}
+  .proof-chart{height:125px}
+  .position-listing>div{grid-template-columns:28px minmax(0,1fr) auto}
+  .position-listing em{display:none}
+  .float-card{width:150px;padding:9px}
+  .float-card-top{right:0;top:4px}
+  .float-card-bottom{left:0;bottom:5px}
+  .landing-story{padding-top:62px;padding-bottom:54px}
+  .landing-feature-grid{padding-bottom:60px}
+  .landing-feature{min-height:280px}
+  .landing-feature h3{font-size:22px}
+  .landing-architecture{padding-top:62px;padding-bottom:62px}
+  .arch-node{width:100%;margin-left:0!important;margin-right:0!important}
+  .arch-engine{margin-top:28px;margin-bottom:28px}
+  .arch-line{height:28px}
+  .landing-final{padding-top:62px;padding-bottom:62px}
+  .landing-final h2{font-size:clamp(44px,13vw,58px)}
+  .landing-footer{display:flex;flex-wrap:wrap;gap:12px;padding-bottom:24px}
 }
