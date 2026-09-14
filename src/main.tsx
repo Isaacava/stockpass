@@ -4,7 +4,7 @@ import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { useAppKitAccount } from '@reown/appkit/react';
 import Landing from './Landing';
-import StockPassAdditions from './StockPassAdditions';
+import ProfileSetupGate from './ProfileSetupGate';
 import './styles.css';
 import './mobile-safety.css';
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -58,14 +58,13 @@ function WorkspaceLoading() {
 function Root() {
   const { isConnected } = useAppKitAccount();
 
-  if (!isConnected) {
-    return <Landing />;
-  }
+  if (!isConnected) return <Landing />;
 
   return (
     <Suspense fallback={<WorkspaceLoading />}>
-      <StockPassApp />
-      <StockPassAdditions />
+      <ProfileSetupGate>
+        <StockPassApp />
+      </ProfileSetupGate>
     </Suspense>
   );
 }
