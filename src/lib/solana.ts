@@ -1,10 +1,10 @@
-import {
-  Connection,
-  PublicKey,
-  TOKEN_2022_PROGRAM_ID,
-  TOKEN_PROGRAM_ID
-} from '@solana/web3.js';
+import { Connection, PublicKey } from '@solana/web3.js';
 import type { StockAsset } from './assets';
+
+// Canonical Solana SPL Token program IDs. Kept local so the app does not depend
+// on web3.js re-exporting these constants across package versions.
+export const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
+export const TOKEN_2022_PROGRAM_ID = new PublicKey('TokenzQdBNbLqP5VEhdkasrYPcaxW1zJ6q6x1vG8VJQy');
 
 export type VerifiedPosition = StockAsset & {
   balance: number;
