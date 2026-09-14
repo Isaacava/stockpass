@@ -4,6 +4,7 @@ import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { useAppKitAccount } from '@reown/appkit/react';
 import Landing from './Landing';
+import StockPassAdditions from './StockPassAdditions';
 import './styles.css';
 import './mobile-safety.css';
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -64,6 +65,7 @@ function Root() {
   return (
     <Suspense fallback={<WorkspaceLoading />}>
       <StockPassApp />
+      <StockPassAdditions />
     </Suspense>
   );
 }
