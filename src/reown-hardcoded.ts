@@ -1,0 +1,1 @@
+export const STOCKPASS_REOWN_PROJECT_ID = '1dbe8fd5e4974ae7c80d074c4082b5a0';
