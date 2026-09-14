@@ -25,13 +25,13 @@ type PriceResponse = {
   dataPoints?: Array<{ price?: number | string }>;
 };
 
-function pickSolanaMint(asset: XStockAssetResponse) {
+function pickSolanaMint(asset: XStockAssetResponse): string {
   const deployments = [...(asset.deployments ?? []), ...(asset.networks ?? [])];
   const solana = deployments.find((entry) => {
     const network = `${entry.network ?? entry.chain ?? ''}`.toLowerCase();
     return network === 'solana' || network.includes('solana');
   });
-  return solana?.address ?? asset.solanaAddress ?? (asset.mintAddress && asset.mintAddress.length > 20 ? asset.mintAddress : undefined);
+  return solana?.address ?? asset.solanaAddress ?? (asset.mintAddress && asset.mintAddress.length > 20 ? asset.mintAddress : '');
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
