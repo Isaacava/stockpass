@@ -29,6 +29,7 @@ StockPass combines three layers:
 - Alert persistence.
 - Mobile navigation and responsive layouts.
 - Original StockPass visual language: signal-console layout, dark navigation rail, blue/cyan evidence accents, compact monospaced metadata, market-signal cards and proof-first interaction patterns.
+- Landing page is the default disconnected experience; the full workspace is lazy-loaded only after a wallet connects so workspace imports cannot block the public landing page.
 
 ## UX principles
 
@@ -42,6 +43,7 @@ The UI emphasizes:
 - compact information density without clutter
 - original StockPass visual patterns rather than copying another product
 - mobile-first interaction with desktop information density
+- public landing page first, workspace only after wallet connection
 
 ## Mainnet-only invariant
 
