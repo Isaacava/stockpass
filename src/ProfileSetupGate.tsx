@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, UserRound, X } from 'lucide-react';
 import { useAppKitAccount } from '@reown/appkit/react';
+import { ensureProfile } from './lib/stockpass';
 import { loadProfile, saveProfile, type StockPassProfile } from './lib/social';
 import StockPassAdditions from './StockPassAdditions';
 import './profile-setup.css';
@@ -24,6 +25,7 @@ export default function ProfileSetupGate({ children }: { children: React.ReactNo
     let cancelled = false;
     (async () => {
       try {
+        await ensureProfile(address);
         const current = await loadProfile(address);
         if (cancelled) return;
         setProfile(current);
@@ -38,7 +40,7 @@ export default function ProfileSetupGate({ children }: { children: React.ReactNo
     return () => { cancelled = true; };
   }, [address, isConnected]);
 
-  const needsSetup = Boolean(isConnected && address && !loading && profile && (!profile.handle || !profile.display_name) && !closed);
+  const needsSetup = Boolean(isConnected && address && !loading && (!profile || !profile.handle || !profile.display_name) && !closed);
 
   const save = async () => {
     if (!address) return;
