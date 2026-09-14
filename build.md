@@ -34,6 +34,11 @@ Core differentiator:
 ### Important implementation rule
 The repository must never guess or hard-code an asset mint from a ticker. Official mint addresses must come from a verified asset registry/configuration before a badge can be granted.
 
+### Mainnet-only product decision
+StockPass is fully mainnet-based. The product will not use devnet balances, simulated trading balances, or a devnet execution rail.
+
+All supported buys, sells, swaps, and position changes will be real Solana mainnet transactions. The resulting wallet state, token balance, transaction signature, and verification snapshot are the source of truth.
+
 ### Next build targets
 1. Replace demo feed rows with Supabase-backed profiles/posts.
 2. Add wallet-signature authentication / wallet-to-profile linking.
@@ -43,13 +48,11 @@ The repository must never guess or hard-code an asset mint from a ticker. Offici
 6. Implement email/Telegram alert workers.
 7. Build public profile pages and selective position cards.
 8. Add milestone auto-post drafts.
-9. Add actual devnet-only demo execution rail, kept separate from mainnet verification.
-10. Test the complete judge flow from wallet connect → verified position → post → follow → alert → public share card.
+9. Build real mainnet buy/sell/swap flows for supported assets, with wallet signing and confirmed transaction receipts.
+10. Test the complete judge flow from wallet connect → verified position → real mainnet trade → updated holdings/PnL → post → follow → alert → public share card.
 
 ## Architecture invariant
 
-**Mainnet = source of truth for ownership verification and market-facing asset state.**
+**Solana mainnet = the single source of truth for ownership, balances, asset state, market-facing state, and transaction execution.**
 
-**Devnet = isolated demo execution environment.**
-
-The two rails must not be mixed. A devnet demo token must never cause a real mainnet holder badge, and a mainnet position must never be treated as a devnet balance.
+There is no devnet trading environment and no simulated balance layer in the product.
