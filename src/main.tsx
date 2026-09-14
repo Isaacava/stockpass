@@ -25,11 +25,14 @@ class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { 
 
   render() {
     if (this.state.error) {
+      const message = this.state.error?.message || 'Unknown client-side error';
       return (
-        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: '#f3f6f9', color: '#101827', fontFamily: 'system-ui, sans-serif' }}>
-          <div style={{ width: 'min(560px, 100%)', background: '#fff', border: '1px solid #d9e1e9', borderRadius: 16, padding: 24, boxShadow: '0 18px 55px rgba(25,39,58,.08)' }}>
+        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 20, background: '#f3f6f9', color: '#101827', fontFamily: 'Manrope, system-ui, sans-serif' }}>
+          <div style={{ width: 'min(640px, 100%)', background: '#fff', border: '1px solid #d9e1e9', borderRadius: 16, padding: 22, boxShadow: '0 18px 55px rgba(25,39,58,.08)' }}>
+            <div style={{ width: 40, height: 40, display: 'grid', placeItems: 'center', borderRadius: 11, background: '#101827', color: '#fff', fontWeight: 800, fontSize: 11, marginBottom: 14 }}>SP</div>
             <strong style={{ display: 'block', fontSize: 18, marginBottom: 8 }}>StockPass could not render</strong>
-            <p style={{ margin: 0, color: '#637083', lineHeight: 1.6 }}>The page hit a client-side error. Reloading may recover the app after a transient wallet or browser initialization issue.</p>
+            <p style={{ margin: 0, color: '#637083', lineHeight: 1.6 }}>The connected workspace threw a client-side error.</p>
+            <pre style={{ margin: '14px 0 0', padding: 12, overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', borderRadius: 10, background: '#101827', color: '#d7e3f1', font: '12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace' }}>{message}</pre>
             <button onClick={() => window.location.reload()} style={{ marginTop: 16, border: 0, borderRadius: 9, padding: '10px 14px', background: '#2864ff', color: '#fff', fontWeight: 800 }}>Reload StockPass</button>
           </div>
         </div>
