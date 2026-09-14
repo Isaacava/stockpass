@@ -1,6 +1,6 @@
 # StockPass build log
 
-## 2026-09-14 — foundation
+## 2026-09-14 — foundation + UI direction
 
 ### Verified external requirements
 - Stocklana is live with a $100,000 main prize pool.
@@ -21,7 +21,7 @@ Core differentiator:
 - Mainnet RPC as the ownership-verification rail.
 - SPL Token + Token-2022 account scanning adapter.
 - Configurable official xStock mint registry.
-- Responsive dark editorial UI for mobile and desktop.
+- Responsive social-trading interface.
 - Discover/social feed prototype.
 - Verified-holder and verified-seller visual states.
 - Portfolio verification page.
@@ -30,6 +30,20 @@ Core differentiator:
 - Proof-backed post composer.
 - Supabase schema for profiles, assets, positions, posts, follows, alerts and activity events.
 - README and environment template.
+
+### UI/UX direction
+The StockPass interface now uses the visual language of the `Isaacava/stockpassport` project as the design reference:
+- light paper-like canvas
+- editorial Inter/system typography with tight display headings
+- restrained blue accent with black/navy primary ink
+- thin neutral borders and low-elevation shadows
+- compact uppercase metadata labels
+- rounded pill actions and concise status chips
+- dense financial data presentation without generic crypto-dashboard styling
+- desktop sidebar navigation with compact mobile navigation
+- portfolio/proof cards inspired by the StockPassport passport/record presentation
+
+The StockPassport codebase is a visual/UX reference only. Its previous Devnet synthetic-asset architecture is not part of StockPass.
 
 ### Important implementation rule
 The repository must never guess or hard-code an asset mint from a ticker. Official mint addresses must come from a verified asset registry/configuration before a badge can be granted.
