@@ -12,6 +12,8 @@ import './reown';
 
 const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
+document.getElementById('boot-screen')?.remove();
+
 class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
 
