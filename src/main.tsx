@@ -7,6 +7,7 @@ import Landing from './Landing';
 import ProfileSetupGate from './ProfileSetupGate';
 import './styles.css';
 import './mobile-safety.css';
+import './x-ui.css';
 import '@solana/wallet-adapter-react-ui/styles.css';
 import './reown';
 
