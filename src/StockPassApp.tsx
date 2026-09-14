@@ -13,6 +13,8 @@ import './social.css';
 type Tab = 'discover' | 'portfolio' | 'alerts' | 'notifications';
 type AlertRow = { id: string; symbol: string; direction: 'above' | 'below'; target: number; active: boolean; mint: string | null };
 
+type ProfileTab = 'posts' | 'portfolio' | 'proof';
+
 export default function StockPassApp() {
   const { open } = useAppKit();
   const { address, isConnected } = useAppKitAccount();
@@ -183,10 +185,12 @@ function Discover({ posts, assets, prices, viewerWallet, onProfile, onAlert, onC
   </>;
 }
 
-function PostCard({ post, assets, prices, onProfile, onAlert }: { post: FeedPost; assets: StockAsset[]; prices: Record<string, number>; onProfile: (wallet: string) => void; onAlert: (symbol: string) => void }) {
+function PostCard({ post, assets, prices, onProfile, onAlert, authorProfile }: { post: FeedPost; assets: StockAsset[]; prices: Record<string, number>; onProfile: (wallet: string) => void; onAlert: (symbol: string) => void; authorProfile?: StockPassProfile | null }) {
   const asset = assets.find((x) => x.mint === post.mint);
   const share = async () => { await navigator.clipboard?.writeText(profileUrl(post.wallet)); };
-  return <article className="post-card"><div className="post-head"><button className="avatar profile-link" onClick={() => onProfile(post.wallet)}>{shortWallet(post.wallet).slice(0, 2)}</button><div className="post-author"><button className="profile-link post-handle" onClick={() => onProfile(post.wallet)}>{shortWallet(post.wallet)}</button><span>{new Date(post.created_at).toLocaleString()}</span></div><div className="proof"><ShieldCheck size={13} /> Verified holder</div></div><p>{post.body}</p>{asset && <button className="position-chip chip-button" onClick={() => onAlert(asset.symbol)}><span className="ticker-dot">{asset.symbol.replace('x', '')}</span><strong>{asset.symbol}</strong><span>{prices[asset.symbol] ? `$${prices[asset.symbol].toFixed(2)}` : 'Live price unavailable'}</span></button>}<div className="post-actions"><button onClick={() => asset && onAlert(asset.symbol)}><Bell size={13} /> Alert me</button><button onClick={() => void share()}><Copy size={13} /> Copy profile link</button></div></article>;
+  const displayName = authorProfile?.display_name || (authorProfile?.handle ? `@${authorProfile.handle}` : shortWallet(post.wallet));
+  const handle = authorProfile?.handle ? `@${authorProfile.handle}` : shortWallet(post.wallet);
+  return <article className="post-card"><div className="post-head"><button className="avatar profile-link" onClick={() => onProfile(post.wallet)}>{displayName.slice(0, 2).toUpperCase()}</button><div className="post-author"><button className="profile-link post-handle" onClick={() => onProfile(post.wallet)}>{displayName}</button><span>{handle} · {new Date(post.created_at).toLocaleString()}</span></div><div className="proof"><ShieldCheck size={13} /> Verified holder</div></div><p>{post.body}</p>{asset && <button className="position-chip chip-button" onClick={() => onAlert(asset.symbol)}><span className="ticker-dot">{asset.symbol.replace('x', '')}</span><strong>{asset.symbol}</strong><span>{prices[asset.symbol] ? `$${prices[asset.symbol].toFixed(2)}` : 'Live price unavailable'}</span></button>}<div className="post-actions"><button onClick={() => asset && onAlert(asset.symbol)}><Bell size={13} /> Alert me</button><button onClick={() => void share()}><Copy size={13} /> Copy profile link</button></div></article>;
 }
 
 function Portfolio({ positions, checking, address, onVerify, onAlert, onProfile }: { positions: VerifiedPosition[]; checking: boolean; address: string | null; onVerify: () => void; onAlert: (symbol: string) => void; onProfile: (wallet: string) => void }) {
@@ -203,15 +207,21 @@ function Activity({ wallet, notifications, onRead, onProfile }: { wallet: string
 }
 
 function PublicProfile({ wallet, viewerWallet, assets, prices, onBack, onFollowToast }: { wallet: string; viewerWallet: string | null; assets: StockAsset[]; prices: Record<string, number>; onBack: () => void; onFollowToast: (message: string) => void }) {
+  const { connection } = useConnection();
   const [profile, setProfile] = useState<StockPassProfile | null>(null);
   const [counts, setCounts] = useState({ followers: 0, following: 0 });
   const [following, setFollowing] = useState(false);
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [profilePositions, setProfilePositions] = useState<VerifiedPosition[]>([]);
+  const [portfolioLoading, setPortfolioLoading] = useState(true);
+  const [profileTab, setProfileTab] = useState<ProfileTab>('posts');
   const [editing, setEditing] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [handle, setHandle] = useState('');
   const [bio, setBio] = useState('');
   const [loading, setLoading] = useState(true);
+
+  const supportedAssets = useMemo(() => assets.filter((asset) => Boolean(asset.mint)), [assets]);
 
   const load = useCallback(async () => {
     try {
@@ -230,6 +240,20 @@ function PublicProfile({ wallet, viewerWallet, assets, prices, onBack, onFollowT
   }, [wallet, viewerWallet]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!supportedAssets.length) {
+      setPortfolioLoading(false);
+      return;
+    }
+    setPortfolioLoading(true);
+    readStockPositions(connection, new PublicKey(wallet), supportedAssets)
+      .then((rows) => { if (!cancelled) setProfilePositions(rows); })
+      .catch(() => { if (!cancelled) setProfilePositions([]); })
+      .finally(() => { if (!cancelled) setPortfolioLoading(false); });
+    return () => { cancelled = true; };
+  }, [connection, wallet, supportedAssets]);
 
   const toggleFollow = async () => {
     if (!viewerWallet || viewerWallet === wallet) return;
@@ -270,13 +294,58 @@ function PublicProfile({ wallet, viewerWallet, assets, prices, onBack, onFollowT
   if (loading) return <div className="profile-page"><button className="ghost-btn compact" onClick={onBack}><ChevronLeft size={14} /> Back</button><div className="data-loading">Loading public profile…</div></div>;
   if (!profile) return <div className="profile-page"><button className="ghost-btn compact" onClick={onBack}><ChevronLeft size={14} /> Back</button><div className="empty-state"><strong>Profile unavailable</strong><span>This wallet has not established a StockPass profile yet.</span></div></div>;
 
-  return <div className="profile-page"><button className="ghost-btn compact" onClick={onBack}><ChevronLeft size={14} /> Back to Discover</button><section className="profile-card"><div className="profile-top"><div className="profile-avatar">{(profile.display_name || profile.handle || shortWallet(wallet)).slice(0, 2).toUpperCase()}</div><div className="profile-title"><span className="eyebrow">PUBLIC WALLET PROFILE</span><h1>{profile.display_name || (profile.handle ? `@${profile.handle}` : shortWallet(wallet))}</h1><button className="profile-link wallet-address" onClick={share}>{shortWallet(wallet)} <Copy size={12} /></button></div><div className="profile-actions">{viewerWallet && viewerWallet !== wallet && <button className={following ? 'ghost-btn compact' : 'primary-btn compact'} onClick={() => void toggleFollow()}><Users size={13} /> {following ? 'Following' : 'Follow'}</button>}<button className="ghost-btn compact" onClick={() => void share()}><Send size={13} /> Share</button>{viewerWallet === wallet && <button className="ghost-btn compact" onClick={() => setEditing((v) => !v)}>Edit profile</button>}</div></div><p className="profile-bio">{profile.bio || 'Proof-backed positions on Solana.'}</p><div className="profile-stats"><div><strong>{counts.followers}</strong><span>followers</span></div><div><strong>{counts.following}</strong><span>following</span></div><div><strong>{posts.length}</strong><span>verified posts</span></div></div>{editing && <div className="profile-editor"><input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Display name" /><input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="Handle" /><textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Short bio" maxLength={220} /><div><button className="ghost-btn compact" onClick={() => setEditing(false)}>Cancel</button><button className="primary-btn compact" onClick={() => void save()}>Save profile</button></div></div>}</section><section className="profile-grid"><div><div className="section-heading"><div><p className="eyebrow">PROOF RECORD</p><h2>Recent positions</h2></div></div>{posts.length ? posts.map((post) => <PostCard key={post.id} post={post} assets={assets} prices={prices} onProfile={() => undefined} onAlert={() => undefined} />) : <div className="empty-state"><ShieldCheck size={19} /><strong>No verified posts</strong><span>This wallet has not published a proof-backed position yet.</span></div>}</div><ShareCard wallet={wallet} profile={profile} posts={posts} counts={counts} /> </section></div>;
+  const name = profile.display_name || (profile.handle ? `@${profile.handle}` : shortWallet(wallet));
+  const username = profile.handle ? `@${profile.handle}` : null;
+  const avatarText = name.replace('@', '').slice(0, 2).toUpperCase();
+
+  return <div className="profile-page">
+    <button className="ghost-btn compact" onClick={onBack}><ChevronLeft size={14} /> Back to Discover</button>
+    <section className="profile-card">
+      <div className="profile-top">
+        <div className="profile-avatar">{avatarText}</div>
+        <div className="profile-title">
+          <span className="eyebrow">PUBLIC WALLET PROFILE</span>
+          <h1>{name}</h1>
+          {username && <div className="profile-username">{username}</div>}
+          <button className="profile-link wallet-address" onClick={share}>{shortWallet(wallet)} <Copy size={12} /></button>
+        </div>
+        <div className="profile-actions">
+          {viewerWallet && viewerWallet !== wallet && <button className={following ? 'ghost-btn compact' : 'primary-btn compact'} onClick={() => void toggleFollow()}><Users size={13} /> {following ? 'Following' : 'Follow'}</button>}
+          <button className="ghost-btn compact" onClick={() => void share()}><Send size={13} /> Share</button>
+          {viewerWallet === wallet && <button className="ghost-btn compact" onClick={() => setEditing((v) => !v)}>Edit profile</button>}
+        </div>
+      </div>
+      <p className="profile-bio">{profile.bio || 'Proof-backed positions on Solana.'}</p>
+      <div className="profile-stats">
+        <div><strong>{counts.followers}</strong><span>followers</span></div>
+        <div><strong>{counts.following}</strong><span>following</span></div>
+        <div><strong>{posts.length}</strong><span>posts</span></div>
+        <div><strong>{profilePositions.length}</strong><span>xStocks</span></div>
+      </div>
+      {editing && <div className="profile-editor"><input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="First name or full name" /><input value={handle} onChange={(e) => setHandle(e.target.value)} placeholder="Username" /><textarea value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Short bio" maxLength={220} /><div><button className="ghost-btn compact" onClick={() => setEditing(false)}>Cancel</button><button className="primary-btn compact" onClick={() => void save()}>Save profile</button></div></div>}
+    </section>
+
+    <nav className="profile-tabs" aria-label="Profile sections">
+      <button className={profileTab === 'posts' ? 'profile-tab active' : 'profile-tab'} onClick={() => setProfileTab('posts')}>Posts <span>{posts.length}</span></button>
+      <button className={profileTab === 'portfolio' ? 'profile-tab active' : 'profile-tab'} onClick={() => setProfileTab('portfolio')}>Portfolio <span>{profilePositions.length}</span></button>
+      <button className={profileTab === 'proof' ? 'profile-tab active' : 'profile-tab'} onClick={() => setProfileTab('proof')}>Proof</button>
+    </nav>
+
+    {profileTab === 'posts' && <section className="profile-grid profile-content-grid"><div className="profile-posts"><div className="section-heading"><div><p className="eyebrow">POSTS</p><h2>Proof-backed posts</h2></div></div>{posts.length ? posts.map((post) => <PostCard key={post.id} post={post} assets={assets} prices={prices} authorProfile={profile} onProfile={() => undefined} onAlert={() => undefined} />) : <div className="empty-state"><ShieldCheck size={19} /><strong>No verified posts</strong><span>This wallet has not published a proof-backed position yet.</span></div>}</div><ShareCard wallet={wallet} profile={profile} posts={posts} counts={counts} positions={profilePositions} /></section>}
+
+    {profileTab === 'portfolio' && <section className="profile-portfolio-section">
+      <div className="profile-portfolio-head"><div><p className="eyebrow">PORTFOLIO</p><h2>All xStocks held by this wallet</h2><div className="section-note">Live balances read from Solana mainnet. Only supported xStocks are shown.</div></div><div className="profile-portfolio-badge"><ShieldCheck size={13} /> Mainnet verified</div></div>
+      {portfolioLoading ? <div className="data-loading">Checking mainnet holdings…</div> : profilePositions.length ? <div className="profile-holdings-list">{profilePositions.map((position) => { const price = prices[position.symbol]; const value = price ? position.balance * price : null; return <article className="profile-holding-row" key={position.mint}><div className="asset-logo">{position.icon}</div><div className="profile-holding-main"><strong>{position.symbol}</strong><span>{position.name}</span></div><div className="profile-holding-balance"><span>Balance</span><b>{position.balance.toLocaleString()}</b></div><div className="profile-holding-price"><span>{price ? 'Live price' : 'Price'}</span><b>{price ? `$${price.toFixed(2)}` : '—'}</b>{value !== null && <small>≈ ${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}</small>}</div><div className="asset-proof"><ShieldCheck size={14} /><span>Onchain</span></div></article>; })}</div> : <div className="empty-state"><WalletCards size={20} /><strong>No supported xStock holdings</strong><span>This wallet currently has no positive balance for the StockPass-supported Solana xStocks.</span></div>}
+    </section>}
+
+    {profileTab === 'proof' && <section className="profile-proof-section"><div className="profile-proof-card"><div className="profile-proof-icon"><ShieldCheck size={20} /></div><div><p className="eyebrow">OWNERSHIP PROOF</p><h2>Solana mainnet wallet</h2><p>StockPass reads the wallet's supported xStock token accounts directly from Solana mainnet. A post can reference that observed state with a fresh verification snapshot.</p><button className="profile-link proof-wallet" onClick={share}>{wallet}</button></div></div><div className="profile-proof-grid"><div><span>Verified xStocks</span><strong>{profilePositions.length}</strong></div><div><span>Published posts</span><strong>{posts.length}</strong></div><div><span>Followers</span><strong>{counts.followers}</strong></div><div><span>Following</span><strong>{counts.following}</strong></div></div></section>}
+  </div>;
 }
 
-function ShareCard({ wallet, profile, posts, counts }: { wallet: string; profile: StockPassProfile; posts: FeedPost[]; counts: { followers: number; following: number } }) {
+function ShareCard({ wallet, profile, posts, counts, positions }: { wallet: string; profile: StockPassProfile; posts: FeedPost[]; counts: { followers: number; following: number }; positions: VerifiedPosition[] }) {
   const post = posts[0];
   const copy = async () => { await navigator.clipboard?.writeText(profileUrl(wallet)); };
-  return <aside className="share-card"><div className="share-card-top"><span>STOCKPASS / PUBLIC PROOF</span><ShieldCheck size={14} /></div><div className="share-mark">SP</div><h3>{profile.display_name || (profile.handle ? `@${profile.handle}` : shortWallet(wallet))}</h3><p>{profile.bio || 'Proof-backed Solana positions.'}</p><div className="share-stat"><strong>{posts.length}</strong><span>verified posts</span><strong>{counts.followers}</strong><span>followers</span></div>{post && <div className="share-proof"><span>Latest proof</span><b>{post.mint ? post.mint.slice(0, 6) + '…' + post.mint.slice(-5) : 'Position'}</b><small>{new Date(post.created_at).toLocaleDateString()}</small></div>}<button className="primary-btn compact" onClick={() => void copy()}><Copy size={13} /> Copy share link</button></aside>;
+  return <aside className="share-card"><div className="share-card-top"><span>STOCKPASS / PUBLIC PROOF</span><ShieldCheck size={14} /></div><div className="share-mark">SP</div><h3>{profile.display_name || (profile.handle ? `@${profile.handle}` : shortWallet(wallet))}</h3>{profile.handle && <div className="share-handle">@{profile.handle}</div>}<p>{profile.bio || 'Proof-backed Solana positions.'}</p><div className="share-stat"><strong>{posts.length}</strong><span>posts</span><strong>{positions.length}</strong><span>xStocks</span><strong>{counts.followers}</strong><span>followers</span></div>{post && <div className="share-proof"><span>Latest proof</span><b>{post.mint ? post.mint.slice(0, 6) + '…' + post.mint.slice(-5) : 'Position'}</b><small>{new Date(post.created_at).toLocaleDateString()}</small></div>}<button className="primary-btn compact" onClick={() => void copy()}><Copy size={13} /> Copy share link</button></aside>;
 }
 
 function ComposeModal({ connected, positions, onClose, onPost }: { connected: boolean; positions: VerifiedPosition[]; onClose: () => void; onPost: (position: VerifiedPosition, body: string) => Promise<void> }) {
