@@ -2,16 +2,16 @@
 
 ## Product direction
 
-StockPass is an independent Solana consumer/social-trading product. The product identity, interaction model and visual system are original to StockPass. External products may be studied for quality standards, but StockPass does not reproduce their branding, layouts or architecture.
+StockPass is an independent Solana utility + social-trading product. The product identity, interaction model and visual system are original to StockPass. External products may be studied for quality standards, but StockPass does not reproduce their branding, layouts or architecture.
 
 ## Core idea
 
 > Anyone can post a screenshot. StockPass can prove what the wallet held on Solana when the claim was made.
 
-StockPass combines three layers:
-- **Proof** — mainnet wallet ownership and timestamped verification snapshots.
-- **Signals** — social posts, follows, verified activity and notifications.
-- **Action** — live market data, alerts and eventually signed mainnet trading.
+StockPass is utility-first with social built around the utility:
+- **Utility** — portfolio, xStock balances, official market data, proof snapshots, alerts and eventually signed mainnet actions.
+- **Signals** — asset context, wallet activity and useful alerts.
+- **Social** — posts, profiles, follows and notifications that make verified information easier to discover and share.
 
 ## Current implementation
 
@@ -35,6 +35,7 @@ StockPass combines three layers:
 - Mobile navigation and responsive layouts.
 - Social timeline visual language inspired by modern consumer feeds: name + @username identity, flat timeline posts, profile tabs, follow actions and compact proof indicators, while retaining original StockPass styling and terminology.
 - Landing page is the default disconnected experience; the full workspace is lazy-loaded only after a wallet connects so workspace imports cannot block the public landing page.
+- Landing page now presents StockPass as a **utility-first xStock platform**: live portfolio, mainnet proof, market context, alerts and future action are the primary story; profiles and social discovery are explicitly secondary context.
 
 ## Additions from the StockPass additions pack
 
@@ -49,12 +50,19 @@ The Telegram migration has been applied to the existing StockPass Supabase proje
 
 ## UX principles
 
-StockPass should feel like a **social market intelligence product**, not a generic crypto dashboard and not a passport/document clone.
+StockPass should feel like a **useful onchain market utility with a social context**, not a generic crypto dashboard and not a social network that happens to display balances.
+
+The hierarchy is:
+1. Portfolio and market utility.
+2. Proof and verification.
+3. Alerts and useful signals.
+4. Social discovery and identity.
 
 The UI emphasizes:
 - clear hierarchy over decorative cards
 - proof state next to the claim it validates
-- market context beside social activity
+- live portfolio utility before social mechanics
+- market context beside positions and alerts
 - fast wallet/profile navigation
 - profile identity built around display name + @username, with wallet address as verifiable secondary identity
 - profile sections that combine social content with the user's live supported xStock holdings
