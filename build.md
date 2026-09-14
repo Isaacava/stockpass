@@ -25,10 +25,15 @@ StockPass combines three layers:
 - Proof-backed post composer.
 - Follower notification fan-out for verified posts.
 - Public wallet profiles and shareable profile/proof links.
-- Portfolio verification view.
+- Profile identity setup with first/full name plus unique-style username/handle.
+- X-like public profile structure with profile header, follow/share/edit actions, profile tabs and social counts.
+- Public profile **Posts** tab for proof-backed posts.
+- Public profile **Portfolio** tab showing every supported xStock currently held by that wallet, read directly from Solana mainnet and paired with live xStock prices when available.
+- Public profile **Proof** tab explaining the wallet verification model and showing current proof statistics.
+- Portfolio verification view for the connected wallet.
 - Alert persistence.
 - Mobile navigation and responsive layouts.
-- Original StockPass visual language: signal-console layout, dark navigation rail, blue/cyan evidence accents, compact monospaced metadata, market-signal cards and proof-first interaction patterns.
+- Social timeline visual language inspired by modern consumer feeds: name + @username identity, flat timeline posts, profile tabs, follow actions and compact proof indicators, while retaining original StockPass styling and terminology.
 - Landing page is the default disconnected experience; the full workspace is lazy-loaded only after a wallet connects so workspace imports cannot block the public landing page.
 
 ## Additions from the StockPass additions pack
@@ -51,6 +56,9 @@ The UI emphasizes:
 - proof state next to the claim it validates
 - market context beside social activity
 - fast wallet/profile navigation
+- profile identity built around display name + @username, with wallet address as verifiable secondary identity
+- profile sections that combine social content with the user's live supported xStock holdings
+- fast switching between Posts, Portfolio and Proof without leaving the public profile
 - compact information density without clutter
 - original StockPass visual patterns rather than copying another product
 - mobile-first interaction with desktop information density
@@ -63,6 +71,8 @@ The UI emphasizes:
 There is no devnet trading environment, simulated portfolio balance or fake execution rail.
 
 Any supported buy, sell or swap will eventually be a real Solana mainnet transaction signed by the connected wallet, with the resulting transaction signature and confirmed wallet state available for verification.
+
+The public profile portfolio also follows this invariant: xStock balances are not copied from Supabase or manually entered profile data. They are read from the wallet's supported Solana token accounts at profile-view time.
 
 ## Database/security
 
@@ -92,4 +102,5 @@ PnL requires a Birdeye API key. The current helper uses `VITE_BIRDEYE_API_KEY` f
 6. Deploy and schedule the StockPass alerts worker.
 7. Finish Telegram connection UX and notification settings.
 8. Milestone-generated post drafts from verified portfolio events.
-9. Judge-flow testing from wallet connection → proof → trade → PnL → post → follow → notification → public proof card.
+9. Improve Discover with first-class profile identities, following-aware feeds and search/discovery.
+10. Judge-flow testing from wallet connection → profile setup → proof → portfolio → trade → PnL → post → follow → notification → public profile.
