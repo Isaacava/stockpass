@@ -1,10 +1,10 @@
 import { Connection, PublicKey } from '@solana/web3.js';
 import type { StockAsset } from './assets';
 
-// Canonical Solana SPL Token program IDs. Kept local so the app does not depend
-// on web3.js re-exporting these constants across package versions.
+// Canonical Solana SPL Token program IDs.
+// Token-2022 address verified against Solana Explorer.
 export const TOKEN_PROGRAM_ID = new PublicKey('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
-export const TOKEN_2022_PROGRAM_ID = new PublicKey('TokenzQdBNbLqP5VEhdkasrYPcaxW1zJ6q6x1vG8VJQy');
+export const TOKEN_2022_PROGRAM_ID = new PublicKey('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb');
 
 export type VerifiedPosition = StockAsset & {
   balance: number;
@@ -36,8 +36,8 @@ export async function readStockPositions(
     .filter((asset) => Boolean(asset.mint && balances.has(asset.mint)))
     .map((asset) => ({
       ...asset,
-      mint: asset.mint!,
-      balance: balances.get(asset.mint!)!,
+      mint: asset.mint,
+      balance: balances.get(asset.mint)!,
       verified: true
     }));
 }
