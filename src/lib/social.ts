@@ -7,6 +7,7 @@ export type StockPassProfile = {
   display_name: string | null;
   bio: string | null;
   avatar_url: string | null;
+  is_demo_bot: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -25,13 +26,13 @@ export type StockPassNotification = {
 };
 
 export async function loadProfile(wallet: string) {
-  const { data, error } = await supabase.from('stockpass_profiles').select('wallet, handle, display_name, bio, avatar_url, created_at, updated_at').eq('wallet', wallet).maybeSingle();
+  const { data, error } = await supabase.from('stockpass_profiles').select('wallet, handle, display_name, bio, avatar_url, is_demo_bot, created_at, updated_at').eq('wallet', wallet).maybeSingle();
   if (error) throw error;
   return (data ?? null) as StockPassProfile | null;
 }
 
 export async function saveProfile(input: Pick<StockPassProfile, 'wallet'> & Partial<Omit<StockPassProfile, 'wallet' | 'created_at' | 'updated_at'>>) {
-  const { data, error } = await supabase.from('stockpass_profiles').upsert({ ...input, updated_at: new Date().toISOString() }, { onConflict: 'wallet' }).select('wallet, handle, display_name, bio, avatar_url, created_at, updated_at').single();
+  const { data, error } = await supabase.from('stockpass_profiles').upsert({ ...input, updated_at: new Date().toISOString() }, { onConflict: 'wallet' }).select('wallet, handle, display_name, bio, avatar_url, is_demo_bot, created_at, updated_at').single();
   if (error) throw error;
   return data as StockPassProfile;
 }
@@ -92,7 +93,7 @@ export async function loadRecentPostsByWallet(wallet: string, limit = 12) {
 export async function searchProfiles(query: string, limit = 10) {
   const needle = query.trim();
   if (!needle) return [] as StockPassProfile[];
-  const { data, error } = await supabase.from('stockpass_profiles').select('wallet, handle, display_name, bio, avatar_url, created_at, updated_at').or(`handle.ilike.%${needle}%,display_name.ilike.%${needle}%,wallet.ilike.%${needle}%`).limit(limit);
+  const { data, error } = await supabase.from('stockpass_profiles').select('wallet, handle, display_name, bio, avatar_url, is_demo_bot, created_at, updated_at').or(`handle.ilike.%${needle}%,display_name.ilike.%${needle}%,wallet.ilike.%${needle}%`).limit(limit);
   if (error) throw error;
   return (data ?? []) as StockPassProfile[];
 }
