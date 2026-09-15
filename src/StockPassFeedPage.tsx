@@ -4,6 +4,7 @@ import type { StockAsset } from './lib/assets';
 import type { FeedPost } from './lib/stockpass';
 import { fetchOfficialPriceSignals, type XStockSignal } from './lib/xstocks';
 import { loadProfile, profileUrl, shortWallet, type StockPassProfile } from './lib/social';
+import './feed-swap.css';
 
 export default function StockPassFeedPage({ posts, assets, prices, viewerWallet, onProfile, onAlert, onCompose, onSwap }: { posts: FeedPost[]; assets: StockAsset[]; prices: Record<string, number>; viewerWallet: string | null; onProfile: (wallet: string) => void; onAlert: (symbol: string) => void; onCompose: () => void; onSwap: (symbol: string) => void }) {
   const [profiles, setProfiles] = useState<Record<string, StockPassProfile>>({});
