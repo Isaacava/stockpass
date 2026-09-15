@@ -69,12 +69,11 @@ export default function StockPassFeedPage({ posts, assets, prices, viewerWallet,
   const followingSet = useMemo(() => new Set(following), [following]);
   const heldSet = useMemo(() => new Set(heldMints), [heldMints]);
   const displayed = useMemo(() => {
-    if (tab === 'stocks') return posts.filter((post) => Boolean(post.mint) && heldSet.has(post.mint));
+    if (tab === 'stocks') return posts.filter((post) => post.mint !== null && heldSet.has(post.mint));
     if (tab === 'following') return posts.filter((post) => followingSet.has(post.wallet));
     return posts;
   }, [posts, tab, heldSet, followingSet]);
 
-  const demoCount = Object.values(profiles).filter((profile) => profile.is_demo_bot).length;
   const tabMeta = tab === 'general'
     ? { kicker: 'GENERAL FEED', title: 'What the market is saying.', copy: 'A clean, chronological stream of StockPass posts. Every attached xStock can open its live market action.' }
     : tab === 'stocks'
