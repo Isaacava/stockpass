@@ -11,9 +11,10 @@ import { createPriceAlert, ensureProfile, loadAlerts, loadNotifications, loadPos
 import { markNotificationsRead, profileUrl, type StockPassNotification } from './lib/social';
 import StockPassDiscoverPage from './StockPassDiscoverPage';
 import StockPassFeedPage from './StockPassFeedPage';
+import StockPassSwapPage from './StockPassSwapPage';
 import './stockpass-redesign.css';
 
-type Page = 'discover' | 'feed' | 'portfolio' | 'alerts' | 'activity';
+type Page = 'discover' | 'feed' | 'portfolio' | 'alerts' | 'activity' | 'swap';
 type AlertRow = { id: string; symbol: string; direction: 'above' | 'below'; target: number; active: boolean; mint: string | null };
 
 export default function StockPassExperience() {
@@ -32,6 +33,7 @@ export default function StockPassExperience() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [toast, setToast] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
+  const [swapSymbol, setSwapSymbol] = useState(STOCKS[0]?.symbol ?? 'AAPLx');
 
   const refresh = useCallback(async () => {
     const official = await resolveOfficialStocks(STOCKS);
@@ -90,6 +92,7 @@ export default function StockPassExperience() {
   }, [toast]);
 
   const go = (next: Page) => { setPage(next); setMobileNav(false); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const openSwap = (symbol: string) => { setSwapSymbol(symbol); go('swap'); };
   const unread = notifications.filter((item) => !item.read_at).length;
   const trackedValue = sumXStockValue(portfolioRows);
 
@@ -131,10 +134,11 @@ export default function StockPassExperience() {
 
     <main className="sp3-main">
       {page === 'discover' && <StockPassDiscoverPage onAssetAlert={addAlert} onOpenProfile={() => go('portfolio')} />}
-      {page === 'feed' && <StockPassFeedPage posts={posts} assets={assets} prices={prices} viewerWallet={address} onProfile={() => window.open(profileUrl(address), '_self')} onAlert={addAlert} onCompose={() => setComposerOpen(true)} />}
+      {page === 'feed' && <StockPassFeedPage posts={posts} assets={assets} prices={prices} viewerWallet={address} onProfile={() => window.open(profileUrl(address), '_self')} onAlert={addAlert} onCompose={() => setComposerOpen(true)} onSwap={openSwap} />}
       {page === 'portfolio' && <PortfolioPage positions={positions} rows={portfolioRows} total={trackedValue} loading={loading} wallet={address} onRefresh={() => void refreshWallet(assets)} onPost={() => setComposerOpen(true)} />}
       {page === 'alerts' && <AlertsPage alerts={alerts} />}
       {page === 'activity' && <ActivityPage notifications={notifications} onRead={() => { void markNotificationsRead(address); setNotifications((items) => items.map((item) => ({ ...item, read_at: item.read_at ?? new Date().toISOString() }))); }} />}
+      {page === 'swap' && <StockPassSwapPage symbol={swapSymbol} assets={assets} onBack={() => go('feed')} />}
     </main>
 
     <footer className="sp3-footer"><span>StockPass</span><span>Solana mainnet · xStocks only</span><span>Proof stays on-chain. Social stays readable.</span></footer>
