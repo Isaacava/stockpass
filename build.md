@@ -9,7 +9,7 @@ StockPass is an independent Solana consumer/social-trading product. The product 
 > Anyone can post a screenshot. StockPass can prove what the wallet held on Solana when the claim was made.
 
 StockPass combines three layers:
-- **Utility** — live supported xStock portfolio, market data, alerts, proof and future wallet-signed actions.
+- **Utility** — live xStock portfolio, xStock market data, alerts, proof and future wallet-signed actions.
 - **Proof** — mainnet wallet ownership and timestamped verification snapshots.
 - **Signals/Social** — posts, follows, verified activity and notifications that sit on top of the utility layer.
 
@@ -32,7 +32,7 @@ StockPass combines three layers:
 - Public profile **Proof** tab explaining the wallet verification model and showing current proof statistics.
 - Public profile **holding badges**: current positive-balance xStocks are displayed beside the user's name as actual official token-logo circles, with overflow collapsed into a `+N` indicator.
 - Portfolio verification view for the connected wallet.
-- Workspace utility panel showing live supported xStock holdings, estimated live value when prices are available, optional PnL, and Telegram alert connection.
+- Workspace utility panel showing live xStock holdings, xStock market value when prices are available, and Telegram alert connection.
 - New **Market utility hub** available from the connected workspace: searchable verified Solana xStock catalog, per-asset live price lookup, official Solana mint, current connected-wallet balance, alert creation, and saved provenance-event history.
 - New **mainnet xStock activity sync**: reads recent confirmed wallet transactions, detects supported xStock balance changes, and records them with slots, block times and confirmed transaction signatures. The decoder now conservatively classifies an xStock increase/decrease as `buy`/`sell` only when an opposite wallet-owned token movement or native-SOL payment movement exists in the same transaction; otherwise it records `receive`/`send`. Classification metadata is stored as inferred rather than presented as a guaranteed protocol-level trade fact.
 - New **mainnet proof receipt**: a positive xStock holding can be saved as a timestamped `stockpass_verification_snapshots` record with the current confirmed slot, and the utility can copy a human-readable proof receipt.
@@ -41,8 +41,8 @@ StockPass combines three layers:
 - New **Supabase session propagation**: the opaque signed-wallet session is attached to PostgREST requests without replacing Supabase's normal publishable-key Authorization header.
 - New **wallet-scoped RLS**: all StockPass tables now have RLS enabled. Public catalog/profile/feed tables retain public-read policies; wallet-owned records require the active signed wallet session. Wallet auth challenge/session rows remain server-only and have no browser policies.
 - New **Discover identity resolution**: feed posts now resolve each unique author wallet against `stockpass_profiles` and pass the saved display name plus `@username` into post cards, while retaining the wallet/profile navigation fallback for accounts without a profile.
-- New **connected-workspace Market mount**: the StockPass Market Utility is now mounted alongside the main workspace rather than existing as an unused component, so the 732-asset catalog, asset detail, proof, alert and provenance surface is reachable from the connected app.
-- New **server-side PnL proxy**: StockPass PnL requests now go through the `stockpass-pnl` Supabase Edge Function instead of exposing a Birdeye API key in the browser. The proxy uses Birdeye's current `token_addresses` parameter and WAC PnL method, while limiting requests to StockPass-approved xStock mints. The API key is read only from the Edge Function environment.
+- New **connected-workspace Market mount**: the StockPass Market Utility is now mounted alongside the main workspace rather than existing as an unused component, so the xStock catalog, asset detail, proof, alert and provenance surface is reachable from the connected app.
+- New **xStocks-only portfolio valuation**: the Market Utility now reads connected-wallet xStock holdings directly from Solana mainnet and multiplies them by prices from the public xStocks API. No Birdeye, Jupiter, or other third-party paid market-data API is needed for the xStock portfolio-value view.
 - Mobile navigation and responsive layouts.
 - Social timeline visual language inspired by modern consumer feeds: name + @username identity, flat timeline posts, profile tabs, follow actions and compact proof indicators, while retaining original StockPass styling and terminology.
 - Utility-first landing page focused on portfolio, mainnet proof, market context, alerts and future signed actions.
@@ -64,9 +64,23 @@ StockPass-specific tables include:
 - `stockpass_wallet_auth_sessions` for hashed opaque authentication sessions.
 - `stockpass_position_events` for mainnet ownership/provenance events and transaction signatures.
 - `stockpass_trade_intents` for quote/sign/submit/confirm state around eventual real wallet-signed actions.
-- `stockpass_pnl_snapshots` for durable portfolio/PnL snapshots.
+- `stockpass_pnl_snapshots` for durable portfolio/provenance snapshots.
 
 These tables are data foundations only; they do not create simulated balances or execute trades by themselves.
+
+## xStock-only data policy
+
+StockPass is intentionally limited to **xStocks**. The supported asset allowlist comes from the official xStocks catalog and Solana mint registry.
+
+For live market data, StockPass uses the xStocks public API only. xStocks documents its public endpoints for asset metadata, market prices, multiplier data, proof of reserves, oracle feeds and other public xStock information, with public endpoints available without authentication. citeturn880421view0
+
+The current free market-value path is:
+1. Read the wallet's actual Solana xStock token accounts.
+2. Match the mint against the official xStock catalog.
+3. Read the asset price from the public xStocks price endpoint.
+4. Compute the wallet's current xStock market value locally.
+
+StockPass does not use Birdeye for portfolio tracking, does not use generic token-market APIs, and does not use non-xStock assets as a source of portfolio truth.
 
 ## Additions from the StockPass additions pack
 
@@ -74,11 +88,10 @@ These tables are data foundations only; they do not create simulated balances or
 - Telegram deep-link client helper.
 - Telegram webhook Edge Function source with webhook-secret validation and Solana-address validation.
 - Scheduled price-alert worker source using Jupiter Price API, in-app activity events and optional Telegram delivery.
-- xStock-scoped portfolio PnL helper originally supplied as a browser-side Birdeye integration.
-- Compact connected-workspace tools panel that exposes Telegram alerts and PnL when the corresponding integrations are configured.
-- The PnL browser key exposure has now been removed: the client calls `stockpass-pnl`, and the Birdeye key belongs in Supabase secrets instead.
+- xStock-scoped portfolio valuation helper using only Solana holdings plus the public xStocks price feed.
+- Compact connected-workspace tools panel that exposes Telegram alerts and xStock market value when those integrations are configured.
 
-The Telegram migration has been applied to the existing StockPass Supabase project. The Telegram Edge Functions remain source-only until bot credentials and scheduling are configured. The `stockpass-pnl` Edge Function is now deployed; it returns a clear configuration error until `BIRDEYE_API_KEY` is supplied as a Supabase secret.
+The Telegram migration has been applied to the existing StockPass Supabase project. Telegram delivery still requires the user-provided bot secrets and scheduling. The old Birdeye PnL path has been removed from the StockPass portfolio UI; current portfolio valuation is xStocks-only.
 
 ## UX principles
 
@@ -98,6 +111,7 @@ The UI emphasizes:
 - mobile-first interaction with desktop information density
 - public landing page first, workspace only after wallet connection
 - no fabricated portfolio balances or simulated mainnet state in the product UI
+- xStocks-only market data and asset tracking
 
 ## Mainnet-only invariant
 
@@ -107,7 +121,7 @@ There is no devnet trading environment, simulated portfolio balance or fake exec
 
 Any supported buy, sell or swap will eventually be a real Solana mainnet transaction signed by the connected wallet, with the resulting transaction signature and confirmed wallet state available for verification.
 
-The public profile portfolio and workspace utility view follow this invariant: xStock balances are not copied from Supabase or manually entered profile data. They are read from the wallet's supported Solana token accounts. The database catalogs official mint metadata; it does not manufacture holdings.
+The public profile portfolio and workspace utility view follow this invariant: xStock balances are not copied from Supabase or manually entered profile data. They are read from the wallet's supported Solana token accounts. The database catalogs official xStock mint metadata; it does not manufacture holdings.
 
 ## Database/security
 
@@ -115,7 +129,7 @@ The shared Supabase project contains the StockPass-specific `stockpass_*` tables
 
 **Wallet authentication and RLS are now active.** The browser obtains a short-lived challenge from the `wallet-auth` Edge Function, signs it with the connected Solana wallet, receives a 7-day opaque session token, and keeps only the token client-side. The database stores only its SHA-256 hash. Supabase requests carry the opaque token through the existing `x-client-info` header while retaining the normal publishable-key Authorization header. The RLS resolver hashes that token and maps it to the authenticated wallet before wallet-owned policies are evaluated.
 
-The current database verification shows all 15 StockPass tables have RLS enabled. The public catalog/assets/profile/feed records have read policies where required; wallet-owned profile, alert, follow, notification, activity, Telegram, position, trade-intent and PnL mutations are wallet-scoped. Challenge/session tables have RLS enabled with zero browser policies because only the wallet-auth Edge Function's service-role client should access them.
+The current database verification shows all StockPass tables have RLS enabled. The public catalog/assets/profile/feed records have read policies where required; wallet-owned profile, alert, follow, notification, activity, Telegram, position, trade-intent and portfolio/provenance mutations are wallet-scoped. Challenge/session tables have RLS enabled with zero browser policies because only the wallet-auth Edge Function's service-role client should access them.
 
 ## Integration setup still required
 
@@ -127,20 +141,20 @@ Telegram delivery requires:
 - deployed `telegram-webhook` and `alerts-worker` Edge Functions
 - a scheduled worker invocation
 
-PnL requires a `BIRDEYE_API_KEY` Supabase secret for the new `stockpass-pnl` Edge Function.
+No third-party paid market-data key is required for the current xStock portfolio-value path.
 
 ## Current next targets
 
-1. Validate the new buy/sell/receive/send activity decoder against real mainnet transactions and tune false-positive boundaries.
-2. Build the remaining Telegram connection/settings UX and notification controls.
-3. Deploy the StockPass alerts worker once the required bot/Jupiter secrets and schedule are available.
-4. Derive durable cost basis and realized/unrealized PnL from transaction/provenance history and persist snapshots server-side.
-5. Detect position reductions/sells and create seller-proof records tied to confirmed signatures.
-6. Upgrade Discover into a first-class 732-asset xStock discovery experience with following-aware feed tabs, search and direct asset navigation.
-7. Expand the Market utility hub into dedicated asset screens with charts, provenance, holder context and action receipts.
-8. Keep the official xStock catalog synchronized as new Solana assets are issued or retired.
-9. Judge-flow testing from wallet connection → signature verification → profile setup → market utility → proof → portfolio → alerts/Telegram → PnL → post → follow → notification → public profile.
+1. Validate the xStock-only buy/sell/receive/send activity decoder against real Solana xStock transactions and tune false-positive boundaries.
+2. Upgrade the Market utility into dedicated xStock asset screens with public xStocks price history, multiplier context, provenance and action receipts.
+3. Finish Telegram connection/settings UX and notification controls around xStock alerts.
+4. Deploy the alerts worker once the required bot secrets and schedule are available.
+5. Derive durable xStock cost basis from confirmed Solana provenance events, without introducing an external paid market-data provider.
+6. Detect xStock position reductions/sells and create seller-proof records tied to confirmed signatures.
+7. Upgrade Discover into a first-class 732-asset xStock discovery experience with following-aware feed tabs, search and direct asset navigation.
+8. Keep the official xStock catalog synchronized as new Solana xStock assets are issued or retired.
+9. Judge-flow testing from wallet connection → signature verification → profile setup → xStock market utility → proof → portfolio value → xStock alerts/Telegram → post → follow → notification → public profile.
 
 ## Build verification
 
-The latest StockPass production deployment before the PnL hardening is `dpl_7zS63EZjNSanzqcmQiikNXBhgPvp`, triggered by the workspace-market mount. The PnL hardening commits are now on `main`, and Vercel should create the next production deployment automatically.
+The latest StockPass production deployment before the xStock-only valuation change was triggered by the connected-workspace Market mount. The xStock-only valuation changes are now on `main` and Vercel should create the next production deployment automatically.
