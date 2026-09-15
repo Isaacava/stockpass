@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import type { StockAsset } from './assets';
 import type { VerifiedPosition } from './solana';
-import { fanoutPostNotification } from './social';
+import { fanoutPostNotification, loadNotifications as loadSocialNotifications } from './social';
 
 export async function ensureProfile(wallet: string) {
   const { error } = await supabase.from('stockpass_profiles').upsert({ wallet, updated_at: new Date().toISOString() }, { onConflict: 'wallet' });
@@ -48,4 +48,8 @@ export async function loadAlerts(wallet: string) {
   const { data, error } = await supabase.from('stockpass_alerts').select('id, mint, direction, target_price, active').eq('wallet', wallet).order('created_at', { ascending: false });
   if (error) throw error;
   return data ?? [];
+}
+
+export async function loadNotifications(wallet: string) {
+  return loadSocialNotifications(wallet);
 }
