@@ -2,16 +2,16 @@
 
 ## Product direction
 
-StockPass is an independent Solana utility + social-trading product. The product identity, interaction model and visual system are original to StockPass. External products may be studied for quality standards, but StockPass does not reproduce their branding, layouts or architecture.
+StockPass is an independent Solana consumer/social-trading product. The product identity, interaction model and visual system are original to StockPass. External products may be studied for quality standards, but StockPass does not reproduce their branding, layouts or architecture.
 
 ## Core idea
 
 > Anyone can post a screenshot. StockPass can prove what the wallet held on Solana when the claim was made.
 
-StockPass is utility-first with social built around the utility:
-- **Utility** — portfolio, xStock balances, official market data, proof snapshots, alerts and eventually signed mainnet actions.
-- **Signals** — asset context, wallet activity and useful alerts.
-- **Social** — posts, profiles, follows and notifications that make verified information easier to discover and share.
+StockPass combines three layers:
+- **Utility** — live supported xStock portfolio, market data, alerts, proof and future wallet-signed actions.
+- **Proof** — mainnet wallet ownership and timestamped verification snapshots.
+- **Signals/Social** — posts, follows, verified activity and notifications that sit on top of the utility layer.
 
 ## Current implementation
 
@@ -31,11 +31,13 @@ StockPass is utility-first with social built around the utility:
 - Public profile **Portfolio** tab showing every supported xStock currently held by that wallet, read directly from Solana mainnet and paired with live xStock prices when available.
 - Public profile **Proof** tab explaining the wallet verification model and showing current proof statistics.
 - Portfolio verification view for the connected wallet.
+- Workspace utility panel showing live supported xStock holdings, estimated live value when prices are available, optional PnL, and Telegram alert connection.
 - Alert persistence.
 - Mobile navigation and responsive layouts.
 - Social timeline visual language inspired by modern consumer feeds: name + @username identity, flat timeline posts, profile tabs, follow actions and compact proof indicators, while retaining original StockPass styling and terminology.
+- Utility-first landing page focused on portfolio, mainnet proof, market context, alerts and future signed actions.
+- Landing preview avoids fake wallet balances; live balances appear after wallet connection.
 - Landing page is the default disconnected experience; the full workspace is lazy-loaded only after a wallet connects so workspace imports cannot block the public landing page.
-- Landing page now presents StockPass as a **utility-first xStock platform**: live portfolio, mainnet proof, market context, alerts and future action are the primary story; profiles and social discovery are explicitly secondary context.
 
 ## Additions from the StockPass additions pack
 
@@ -50,19 +52,12 @@ The Telegram migration has been applied to the existing StockPass Supabase proje
 
 ## UX principles
 
-StockPass should feel like a **useful onchain market utility with a social context**, not a generic crypto dashboard and not a social network that happens to display balances.
-
-The hierarchy is:
-1. Portfolio and market utility.
-2. Proof and verification.
-3. Alerts and useful signals.
-4. Social discovery and identity.
+StockPass should feel like a **utility-first onchain xStock product with a social layer**, not a generic crypto dashboard, not a social network that merely displays balances, and not a passport/document clone.
 
 The UI emphasizes:
-- clear hierarchy over decorative cards
+- portfolio and market utility before social activity
 - proof state next to the claim it validates
-- live portfolio utility before social mechanics
-- market context beside positions and alerts
+- market context beside wallet state
 - fast wallet/profile navigation
 - profile identity built around display name + @username, with wallet address as verifiable secondary identity
 - profile sections that combine social content with the user's live supported xStock holdings
@@ -71,6 +66,7 @@ The UI emphasizes:
 - original StockPass visual patterns rather than copying another product
 - mobile-first interaction with desktop information density
 - public landing page first, workspace only after wallet connection
+- no fabricated portfolio balances or simulated mainnet state in the product UI
 
 ## Mainnet-only invariant
 
@@ -80,7 +76,7 @@ There is no devnet trading environment, simulated portfolio balance or fake exec
 
 Any supported buy, sell or swap will eventually be a real Solana mainnet transaction signed by the connected wallet, with the resulting transaction signature and confirmed wallet state available for verification.
 
-The public profile portfolio also follows this invariant: xStock balances are not copied from Supabase or manually entered profile data. They are read from the wallet's supported Solana token accounts at profile-view time.
+The public profile portfolio and workspace utility view also follow this invariant: xStock balances are not copied from Supabase or manually entered profile data. They are read from the wallet's supported Solana token accounts.
 
 ## Database/security
 
@@ -111,4 +107,5 @@ PnL requires a Birdeye API key. The current helper uses `VITE_BIRDEYE_API_KEY` f
 7. Finish Telegram connection UX and notification settings.
 8. Milestone-generated post drafts from verified portfolio events.
 9. Improve Discover with first-class profile identities, following-aware feeds and search/discovery.
-10. Judge-flow testing from wallet connection → profile setup → proof → portfolio → trade → PnL → post → follow → notification → public profile.
+10. Add richer asset-level utility views: holdings history, transaction provenance and a dedicated supported-xStock market screen.
+11. Judge-flow testing from wallet connection → profile setup → utility → proof → portfolio → trade → PnL → post → follow → notification → public profile.
