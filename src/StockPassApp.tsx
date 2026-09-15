@@ -179,9 +179,35 @@ function NavButton({ active, onClick, children }: { active: boolean; onClick: ()
 }
 
 function Discover({ posts, assets, prices, viewerWallet, onProfile, onAlert, onCompose }: { posts: FeedPost[]; assets: StockAsset[]; prices: Record<string, number>; viewerWallet: string | null; onProfile: (wallet: string) => void; onAlert: (symbol: string) => void; onCompose: () => void }) {
+  const [authorProfiles, setAuthorProfiles] = useState<Record<string, StockPassProfile>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const wallets = Array.from(new Set(posts.map((post) => post.wallet).filter(Boolean)));
+    if (!wallets.length) {
+      setAuthorProfiles({});
+      return () => { cancelled = true; };
+    }
+    (async () => {
+      const entries = await Promise.all(wallets.map(async (wallet) => {
+        try {
+          const profile = await loadProfile(wallet);
+          return profile ? [wallet, profile] as const : null;
+        } catch {
+          return null;
+        }
+      }));
+      if (cancelled) return;
+      const next: Record<string, StockPassProfile> = {};
+      for (const entry of entries) if (entry) next[entry[0]] = entry[1];
+      setAuthorProfiles(next);
+    })();
+    return () => { cancelled = true; };
+  }, [posts]);
+
   return <>
     <section className="hero"><div className="hero-copy-wrap"><p className="eyebrow">ONCHAIN SOCIAL TRADING</p><h1>Show the position.<br /><span>Prove the position.</span></h1><p className="hero-copy">Follow conviction backed by wallet state, not screenshots. Every proof starts from a real Solana mainnet position snapshot.</p><div className="hero-actions"><button className="primary-btn" onClick={onCompose}><Plus size={15} /> Post a position</button><button className="ghost-btn" onClick={() => viewerWallet && onProfile(viewerWallet)}><Users size={15} /> Your profile</button></div><div className="hero-proof"><div><strong>OWNERSHIP</strong><span>Verified from the connected wallet.</span></div><div><strong>SOCIAL GRAPH</strong><span>Follow real wallet identities.</span></div><div><strong>PROOF</strong><span>Snapshot timestamp and slot.</span></div></div></div><div className="hero-card"><div className="hero-card-top"><span>TRUST LAYER</span><ShieldCheck size={14} /></div><div className="score-line"><strong>LIVE</strong><span>mainnet source</span><div className="score-ring">✓</div></div><div className="trust-row"><span>Feed</span><b>Verified posts</b></div><div className="trust-row"><span>Social</span><b>Follow graph</b></div><div className="trust-row"><span>Alerts</span><b>In-app</b></div></div></section>
-    <section className="content-section"><div className="section-heading"><div><p className="eyebrow">DISCOVER</p><h2>What verified wallets are saying</h2><div className="section-note">Click a wallet to inspect its public StockPass profile.</div></div></div><div className="feed-grid"><div className="feed-column">{posts.length ? posts.map((post) => <PostCard key={post.id} post={post} assets={assets} prices={prices} onProfile={onProfile} onAlert={onAlert} />) : <div className="empty-state"><Eye size={20} /><strong>No verified posts yet</strong><span>Own a supported xStock, verify it, and publish the first proof-backed post.</span></div>}</div><aside className="sidebar-card"><div className="side-title"><span>Live xStocks</span><ShieldCheck size={14} /></div>{assets.filter((x) => prices[x.symbol]).slice(0, 6).map((asset) => <div className="trend-row" key={asset.symbol}><span className="ticker-dot">{asset.symbol.replace('x', '')}</span><div><strong>{asset.symbol}</strong><small>{asset.name}</small></div><div className="trend-price"><b>${prices[asset.symbol].toFixed(2)}</b><span>official feed</span></div></div>)}</aside></div></section>
+    <section className="content-section"><div className="section-heading"><div><p className="eyebrow">DISCOVER</p><h2>What verified wallets are saying</h2><div className="section-note">Click a wallet to inspect its public StockPass profile.</div></div></div><div className="feed-grid"><div className="feed-column">{posts.length ? posts.map((post) => <PostCard key={post.id} post={post} assets={assets} prices={prices} authorProfile={authorProfiles[post.wallet]} onProfile={onProfile} onAlert={onAlert} />) : <div className="empty-state"><Eye size={20} /><strong>No verified posts yet</strong><span>Own a supported xStock, verify it, and publish the first proof-backed post.</span></div>}</div><aside className="sidebar-card"><div className="side-title"><span>Live xStocks</span><ShieldCheck size={14} /></div>{assets.filter((x) => prices[x.symbol]).slice(0, 6).map((asset) => <div className="trend-row" key={asset.symbol}><span className="ticker-dot">{asset.symbol.replace('x', '')}</span><div><strong>{asset.symbol}</strong><small>{asset.name}</small></div><div className="trend-price"><b>${prices[asset.symbol].toFixed(2)}</b><span>official feed</span></div></div>)}</aside></div></section>
   </>;
 }
 
