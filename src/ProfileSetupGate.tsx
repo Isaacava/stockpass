@@ -4,6 +4,7 @@ import { useAppKitAccount } from '@reown/appkit/react';
 import { ensureProfile } from './lib/stockpass';
 import { loadProfile, saveProfile, type StockPassProfile } from './lib/social';
 import StockPassAdditions from './StockPassAdditions';
+import ProfileHoldingBadges from './ProfileHoldingBadges';
 import './profile-setup.css';
 
 const discoverUtilityCss = `
@@ -95,6 +96,7 @@ export default function ProfileSetupGate({ children }: { children: React.ReactNo
     <style>{discoverUtilityCss}</style>
     {children}
     <StockPassAdditions />
+    <ProfileHoldingBadges />
     {needsSetup && (
       <div className="sp-profile-backdrop">
         <div className="sp-profile-modal" role="dialog" aria-modal="true" aria-labelledby="sp-profile-title">
