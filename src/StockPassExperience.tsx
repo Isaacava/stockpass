@@ -95,6 +95,7 @@ export default function StockPassExperience() {
   const openSwap = (symbol: string) => { setSwapSymbol(symbol); go('swap'); };
   const unread = notifications.filter((item) => !item.read_at).length;
   const trackedValue = sumXStockValue(portfolioRows);
+  const heldMints = positions.map((position) => position.mint);
 
   const addAlert = async (symbol: string) => {
     if (!address) return setToast('Connect your wallet to create alerts.');
@@ -134,7 +135,7 @@ export default function StockPassExperience() {
 
     <main className="sp3-main">
       {page === 'discover' && <StockPassDiscoverPage onAssetAlert={addAlert} onOpenProfile={() => go('portfolio')} />}
-      {page === 'feed' && <StockPassFeedPage posts={posts} assets={assets} prices={prices} viewerWallet={address} heldMints={positions.map((position) => position.mint)} onProfile={(wallet) => window.open(profileUrl(wallet), '_self')} onAlert={addAlert} onCompose={() => setComposerOpen(true)} onSwap={openSwap} />}
+      {page === 'feed' && <StockPassFeedPage posts={posts} assets={assets} prices={prices} viewerWallet={address} heldMints={heldMints} onProfile={(wallet) => window.open(profileUrl(wallet), '_self')} onAlert={addAlert} onCompose={() => setComposerOpen(true)} onSwap={openSwap} />}
       {page === 'portfolio' && <PortfolioPage positions={positions} rows={portfolioRows} total={trackedValue} loading={loading} wallet={address} onRefresh={() => void refreshWallet(assets)} onPost={() => setComposerOpen(true)} />}
       {page === 'alerts' && <AlertsPage alerts={alerts} />}
       {page === 'activity' && <ActivityPage notifications={notifications} onRead={() => { void markNotificationsRead(address); setNotifications((items) => items.map((item) => ({ ...item, read_at: item.read_at ?? new Date().toISOString() }))); }} />}
@@ -174,5 +175,5 @@ function Composer({ positions, onClose, onPublish }: { positions: VerifiedPositi
   const [selected, setSelected] = useState(positions[0]?.mint ?? '');
   const [body, setBody] = useState('');
   const current = positions.find((position) => position.mint === selected) ?? positions[0];
-  return <div className="sp3-overlay" onClick={onClose}><section className="sp3-composer" onClick={(event) => event.stopPropagation()}><div className="sp3-composer-head"><div><div className="sp3-kicker">PROOFED POST</div><h3>Publish a position</h3></div><button className="sp3-close" onClick={onClose}><X size={16} /></button></div>{current ? <><select value={selected} onChange={(event) => setSelected(event.target.value)}>{positions.map((position) => <option key={position.mint} value={position.mint}>{position.symbol} · {position.balance.toLocaleString()} held</option>)}</select><textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="What are you seeing?" maxLength={500} /><div className="sp3-composer-foot"><span>Fresh Solana mainnet snapshot on publish</span><button className="sp3-primary" disabled={!body.trim()} onClick={() => void onPublish(current, body)}>Publish proof</button></div></> : <div className="sp3-empty"><ShieldCheck size={20} /><strong>No xStock positions to post</strong><span>Hold a supported xStock on Solana mainnet before publishing a proof-backed post.</span></div>}</section></div>;
+  return <div className="sp3-overlay" onClick={onClose}><section className="sp3-modal" onClick={(event) => event.stopPropagation()}><div className="sp3-modal-head"><div><div className="sp3-kicker">VERIFIED POST</div><h2>Publish what you hold.</h2></div><button onClick={onClose} aria-label="Close"><X size={18} /></button></div>{current ? <><label className="sp3-field-label">POSITION</label><select value={selected} onChange={(event) => setSelected(event.target.value)}>{positions.map((position) => <option key={position.mint} value={position.mint}>{position.symbol} · {position.balance.toLocaleString()} held</option>)}</select><label className="sp3-field-label">POST</label><textarea value={body} onChange={(event) => setBody(event.target.value)} maxLength={500} placeholder="What do you want the market to know?" /><div className="sp3-modal-foot"><span>Snapshot taken at publish time.</span><button className="sp3-primary" onClick={() => body.trim() && void onPublish(current, body)}>Publish proof</button></div></> : <div className="sp3-empty"><ShieldCheck size={20} /><strong>No verified position available</strong><span>StockPass only publishes positions it can confirm on Solana mainnet.</span></div>}</section></div>;
 }
