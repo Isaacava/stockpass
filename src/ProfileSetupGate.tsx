@@ -6,6 +6,7 @@ import { loadProfile, saveProfile, type StockPassProfile } from './lib/social';
 import StockPassAdditions from './StockPassAdditions';
 import ProfileHoldingBadges from './ProfileHoldingBadges';
 import MobileSocialBar from './MobileSocialBar';
+import StockPassUtilityHub from './StockPassUtilityHub';
 import './profile-setup.css';
 import './mobile-social.css';
 
@@ -99,6 +100,7 @@ export default function ProfileSetupGate({ children }: { children: React.ReactNo
     {children}
     <ProfileHoldingBadges />
     <StockPassAdditions />
+    <StockPassUtilityHub />
     <MobileSocialBar />
     {needsSetup && (
       <div className="sp-profile-backdrop">
