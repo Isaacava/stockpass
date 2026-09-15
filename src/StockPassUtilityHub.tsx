@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { useAppKitAccount } from '@reown/appkit/react';
-import { Bell, Check, ChevronRight, RefreshCw, Search, ShieldCheck, TrendingUp, WalletCards, X } from 'lucide-react';
+import { Bell, Check, ChevronRight, Copy, FileCheck2, RefreshCw, Search, ShieldCheck, TrendingUp, WalletCards, X } from 'lucide-react';
 import { fetchOfficialPrices, resolveOfficialStocks } from './lib/xstocks';
 import { readStockPositions, type VerifiedPosition } from './lib/solana';
 import { syncRecentXStockActivity } from './lib/solanaActivity';
@@ -44,6 +44,7 @@ export default function StockPassUtilityHub() {
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [loadingAsset, setLoadingAsset] = useState(false);
   const [syncingActivity, setSyncingActivity] = useState(false);
+  const [savingProof, setSavingProof] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -120,6 +121,7 @@ export default function StockPassUtilityHub() {
     setSelectedPrice(null);
     setSelectedPosition(null);
     setEvents([]);
+    setMessage('');
     try {
       if (row.solana_mint) {
         const resolved = await resolveOfficialStocks([{ symbol: row.symbol, name: row.name, icon: row.symbol.replace(/x$/i, ''), mint: row.solana_mint, source: 'xStocks' }]);
@@ -152,6 +154,43 @@ export default function StockPassUtilityHub() {
       active: true
     });
     setMessage(error ? 'Could not create the alert.' : `${selected.symbol} alert saved.`);
+  };
+
+  const saveProofSnapshot = async () => {
+    if (!address || !selected?.solana_mint || !selectedPosition) {
+      setMessage('A verified positive mainnet balance is required for a proof snapshot.');
+      return;
+    }
+    setSavingProof(true);
+    try {
+      const slot = await connection.getSlot('confirmed');
+      const { error } = await supabase.from('stockpass_verification_snapshots').insert({
+        wallet: address,
+        mint: selectedPosition.mint,
+        balance: selectedPosition.balance,
+        slot,
+        observed_at: new Date().toISOString(),
+        transaction_signature: null
+      });
+      if (error) throw error;
+      setMessage(`${selected.symbol} proof snapshot saved at slot ${slot}.`);
+    } catch {
+      setMessage('Could not save the verification snapshot.');
+    } finally {
+      setSavingProof(false);
+    }
+  };
+
+  const copyProofLabel = async () => {
+    if (!address || !selected?.solana_mint || !selectedPosition) return;
+    const slot = await connection.getSlot('confirmed');
+    const text = `StockPass proof · ${selected.symbol} · ${selectedPosition.balance} held · Solana mainnet slot ${slot} · ${address}`;
+    try {
+      await navigator.clipboard?.writeText(text);
+      setMessage('Proof receipt copied.');
+    } catch {
+      setMessage('Could not copy the proof receipt.');
+    }
   };
 
   const totalPnl = sumPortfolioPnl(pnl);
@@ -188,6 +227,11 @@ export default function StockPassUtilityHub() {
           <div><span>Mint</span><strong>{selected.solana_mint ? `${selected.solana_mint.slice(0, 5)}…${selected.solana_mint.slice(-5)}` : 'Unavailable'}</strong></div>
         </div>
         <div className="sp-asset-actions"><button onClick={() => void createAlert()}><Bell size={14} /> Set alert</button><button onClick={() => setMessage('Trading rail is being connected to wallet-signed mainnet execution.')}><TrendingUp size={14} /> Action</button></div>
+        {selectedPosition && <div className="sp-proof-receipt">
+          <div className="sp-proof-receipt-head"><div><span className="sp-utility-eyebrow">MAINNET PROOF</span><strong>Current ownership receipt</strong></div><FileCheck2 size={16} /></div>
+          <div className="sp-proof-receipt-grid"><div><span>Asset</span><strong>{selected.symbol}</strong></div><div><span>Balance</span><strong>{selectedPosition.balance.toLocaleString()}</strong></div><div><span>Mint</span><strong>{selectedPosition.mint.slice(0, 5)}…{selectedPosition.mint.slice(-5)}</strong></div></div>
+          <div className="sp-proof-receipt-actions"><button onClick={() => void saveProofSnapshot()} disabled={savingProof}><FileCheck2 size={13} /> {savingProof ? 'Saving…' : 'Save proof'}</button><button onClick={() => void copyProofLabel()}><Copy size={13} /> Copy receipt</button></div>
+        </div>}
         <div className="sp-utility-section">
           <div className="sp-utility-section-head"><strong>Ownership activity</strong><button className="ghost-btn compact" onClick={() => void syncActivity()} disabled={syncingActivity || !address}><RefreshCw size={13} className={syncingActivity ? 'sp-spin' : ''} /> {syncingActivity ? 'Syncing…' : 'Sync mainnet'}</button></div>
           {events.length ? events.map((event) => <div className="sp-event-row" key={event.id}><span className="sp-event-mark">{event.event_type.slice(0, 1).toUpperCase()}</span><div><strong>{event.event_type}</strong><span>{event.quantity_delta !== null ? `${event.quantity_delta > 0 ? '+' : ''}${event.quantity_delta}` : 'snapshot'} · {event.block_time ? new Date(event.block_time).toLocaleString() : new Date(event.created_at).toLocaleString()}</span></div>{event.transaction_signature && <a href={`https://solscan.io/tx/${event.transaction_signature}`} target="_blank" rel="noreferrer">View</a>}</div>) : <div className="sp-utility-empty"><WalletCards size={16} /><span>No saved provenance events yet. Sync recent confirmed mainnet activity to populate this history.</span></div>}
