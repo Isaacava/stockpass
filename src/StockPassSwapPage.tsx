@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, ExternalLink, ShieldCheck, WalletCards } from 'lucide-react';
 import type { StockAsset } from './lib/assets';
 import { fetchOfficialPrices, resolveOfficialStocks } from './lib/xstocks';
+import './feed-swap.css';
 
 const JUPITER_SOL_MINT = 'So11111111111111111111111111111111111111112';
 
