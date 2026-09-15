@@ -27,8 +27,7 @@ export default function TokenHoldingBadges() {
 
   useEffect(() => {
     const update = () => {
-      const params = new URLSearchParams(window.location.search);
-      const wallet = params.get('profile');
+      const wallet = new URLSearchParams(window.location.search).get('profile');
       setProfileWallet(wallet);
       setSlot(wallet ? findSlot() : null);
     };
@@ -62,8 +61,7 @@ export default function TokenHoldingBadges() {
             name: row.name,
             icon: row.symbol.replace(/x$/i, ''),
             mint: row.solana_mint,
-            source: 'xStocks' as const,
-            logo: row.logo_url ?? undefined
+            source: 'xStocks' as const
           }));
         const holdings = await readStockPositions(connection, new PublicKey(profileWallet), assets);
         if (!cancelled) setPositions(holdings);
@@ -78,7 +76,7 @@ export default function TokenHoldingBadges() {
     const byMint = new Map(catalog.map((row) => [row.solana_mint, row.logo_url]));
     return positions.map((position) => ({
       ...position,
-      logo: position.logo || byMint.get(position.mint) || null
+      logo: byMint.get(position.mint) || null
     }));
   }, [catalog, positions]);
 
