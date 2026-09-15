@@ -5,7 +5,9 @@ import { ensureProfile } from './lib/stockpass';
 import { loadProfile, saveProfile, type StockPassProfile } from './lib/social';
 import StockPassAdditions from './StockPassAdditions';
 import ProfileHoldingBadges from './ProfileHoldingBadges';
+import MobileSocialBar from './MobileSocialBar';
 import './profile-setup.css';
+import './mobile-social.css';
 
 const discoverUtilityCss = `
 .hero + .content-section{border-top:1px solid var(--sp-line)}
@@ -95,8 +97,9 @@ export default function ProfileSetupGate({ children }: { children: React.ReactNo
   return <>
     <style>{discoverUtilityCss}</style>
     {children}
-    <StockPassAdditions />
     <ProfileHoldingBadges />
+    <StockPassAdditions />
+    <MobileSocialBar />
     {needsSetup && (
       <div className="sp-profile-backdrop">
         <div className="sp-profile-modal" role="dialog" aria-modal="true" aria-labelledby="sp-profile-title">
