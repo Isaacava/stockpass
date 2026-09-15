@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { useAppKitAccount } from '@reown/appkit/react';
-import { Bell, Check, ChevronRight, Search, ShieldCheck, TrendingUp, WalletCards, X } from 'lucide-react';
+import { Bell, Check, ChevronRight, RefreshCw, Search, ShieldCheck, TrendingUp, WalletCards, X } from 'lucide-react';
 import { fetchOfficialPrices, resolveOfficialStocks } from './lib/xstocks';
 import { readStockPositions, type VerifiedPosition } from './lib/solana';
+import { syncRecentXStockActivity } from './lib/solanaActivity';
 import { fetchPortfolioPnl, sumPortfolioPnl, type TokenPnl } from './lib/pnl';
 import { supabase } from './lib/supabase';
 import './stockpass-utility-hub.css';
@@ -42,6 +43,7 @@ export default function StockPassUtilityHub() {
   const [pnl, setPnl] = useState<TokenPnl[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [loadingAsset, setLoadingAsset] = useState(false);
+  const [syncingActivity, setSyncingActivity] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
@@ -75,6 +77,43 @@ export default function StockPassUtilityHub() {
     return catalog.filter((row) => `${row.symbol} ${row.name}`.toLowerCase().includes(needle)).slice(0, 80);
   }, [catalog, query]);
 
+  const loadEvents = async (wallet: string, mint: string) => {
+    const { data } = await supabase
+      .from('stockpass_position_events')
+      .select('id,symbol,event_type,quantity_delta,transaction_signature,block_time,created_at')
+      .eq('wallet', wallet)
+      .eq('mint', mint)
+      .order('created_at', { ascending: false })
+      .limit(12);
+    setEvents((data ?? []) as PositionEvent[]);
+  };
+
+  const syncActivity = async () => {
+    if (!address) {
+      setMessage('Connect a wallet to sync mainnet ownership activity.');
+      return;
+    }
+    setSyncingActivity(true);
+    try {
+      const assets = catalog
+        .filter((row) => row.solana_mint)
+        .map((row) => ({
+          symbol: row.symbol,
+          name: row.name,
+          icon: row.symbol.replace(/x$/i, ''),
+          mint: row.solana_mint!,
+          source: 'xStocks' as const
+        }));
+      const synced = await syncRecentXStockActivity(connection, new PublicKey(address), assets);
+      setMessage(synced.length ? `Synced ${synced.length} new mainnet xStock events.` : 'No new xStock balance changes found in recent mainnet activity.');
+      if (selected?.solana_mint) await loadEvents(address, selected.solana_mint);
+    } catch {
+      setMessage('Could not sync recent Solana activity.');
+    } finally {
+      setSyncingActivity(false);
+    }
+  };
+
   const openAsset = async (row: CatalogRow) => {
     setSelected(row);
     setLoadingAsset(true);
@@ -89,14 +128,7 @@ export default function StockPassUtilityHub() {
         if (address) {
           const positions = await readStockPositions(connection, new PublicKey(address), resolved);
           setSelectedPosition(positions[0] ?? null);
-          const { data } = await supabase
-            .from('stockpass_position_events')
-            .select('id,symbol,event_type,quantity_delta,transaction_signature,block_time,created_at')
-            .eq('wallet', address)
-            .eq('mint', row.solana_mint)
-            .order('created_at', { ascending: false })
-            .limit(12);
-          setEvents((data ?? []) as PositionEvent[]);
+          await loadEvents(address, row.solana_mint);
         }
       }
     } catch {
@@ -156,7 +188,10 @@ export default function StockPassUtilityHub() {
           <div><span>Mint</span><strong>{selected.solana_mint ? `${selected.solana_mint.slice(0, 5)}…${selected.solana_mint.slice(-5)}` : 'Unavailable'}</strong></div>
         </div>
         <div className="sp-asset-actions"><button onClick={() => void createAlert()}><Bell size={14} /> Set alert</button><button onClick={() => setMessage('Trading rail is being connected to wallet-signed mainnet execution.')}><TrendingUp size={14} /> Action</button></div>
-        <div className="sp-utility-section"><div className="sp-utility-section-head"><strong>Ownership activity</strong><span>mainnet provenance</span></div>{events.length ? events.map((event) => <div className="sp-event-row" key={event.id}><span className="sp-event-mark">{event.event_type.slice(0, 1).toUpperCase()}</span><div><strong>{event.event_type}</strong><span>{event.quantity_delta !== null ? `${event.quantity_delta > 0 ? '+' : ''}${event.quantity_delta}` : 'snapshot'} · {event.block_time ? new Date(event.block_time).toLocaleString() : new Date(event.created_at).toLocaleString()}</span></div>{event.transaction_signature && <a href={`https://solscan.io/tx/${event.transaction_signature}`} target="_blank" rel="noreferrer">View</a>}</div>) : <div className="sp-utility-empty"><WalletCards size={16} /><span>No saved provenance events yet. Verification snapshots will feed this history as the event sync is enabled.</span></div>}</div>
+        <div className="sp-utility-section">
+          <div className="sp-utility-section-head"><strong>Ownership activity</strong><button className="ghost-btn compact" onClick={() => void syncActivity()} disabled={syncingActivity || !address}><RefreshCw size={13} className={syncingActivity ? 'sp-spin' : ''} /> {syncingActivity ? 'Syncing…' : 'Sync mainnet'}</button></div>
+          {events.length ? events.map((event) => <div className="sp-event-row" key={event.id}><span className="sp-event-mark">{event.event_type.slice(0, 1).toUpperCase()}</span><div><strong>{event.event_type}</strong><span>{event.quantity_delta !== null ? `${event.quantity_delta > 0 ? '+' : ''}${event.quantity_delta}` : 'snapshot'} · {event.block_time ? new Date(event.block_time).toLocaleString() : new Date(event.created_at).toLocaleString()}</span></div>{event.transaction_signature && <a href={`https://solscan.io/tx/${event.transaction_signature}`} target="_blank" rel="noreferrer">View</a>}</div>) : <div className="sp-utility-empty"><WalletCards size={16} /><span>No saved provenance events yet. Sync recent confirmed mainnet activity to populate this history.</span></div>}
+        </div>
       </div> : <div className="sp-utility-list">
         {loadingCatalog ? <div className="sp-utility-empty">Loading the verified xStock catalog…</div> : filtered.map((row) => <button className="sp-xstock-row" key={row.symbol} onClick={() => void openAsset(row)}><span className="sp-xstock-logo">{row.logo_url ? <img src={row.logo_url} alt="" /> : row.symbol.replace(/x$/i, '').slice(0, 3)}</span><span className="sp-xstock-copy"><strong>{row.symbol}</strong><small>{row.name}</small></span><ShieldCheck size={13} /><ChevronRight size={13} /></button>)}{!filtered.length && <div className="sp-utility-empty">No verified xStocks match “{query}”.</div>}</div>}
       {message && <div className="sp-utility-message"><Check size={13} /> {message}</div>}
