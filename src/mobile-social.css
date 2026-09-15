@@ -1,0 +1,54 @@
+/* Clean consumer-feed layer inspired by modern mobile social products, with StockPass utility-first structure. */
+.sp-mobile-social-bar{display:none}
+@media(max-width:720px){
+  html,body,#root{background:#fff}
+  .app-shell{padding-bottom:64px!important}
+  .main{width:100%!important;max-width:680px!important;border:0!important}
+  .topbar{height:52px!important;padding:0 12px!important;background:rgba(255,255,255,.96)!important;border-bottom:1px solid #edf0f2!important}
+  .top-actions{gap:4px!important}
+  .topbar .ghost-btn.compact{display:none!important}
+  .topbar .wallet-adapter-button{height:34px!important;padding:0 12px!important;font-size:10px!important}
+  .hero{padding:18px 15px 14px!important;border-bottom:1px solid #edf0f2!important}
+  .hero h1{font-size:30px!important;line-height:1.02!important}
+  .hero-copy{font-size:12px!important;line-height:1.55!important}
+  .hero-proof{margin-top:15px!important}
+  .hero-card{display:none!important}
+  .hero + .content-section .section-heading{padding:13px 15px 11px!important}
+  .hero + .content-section .section-heading h2{font-size:19px!important}
+  .hero + .content-section .sidebar-card{margin:0!important;border-radius:0!important}
+  .hero + .content-section .sidebar-card .side-title{padding:14px 15px 9px!important}
+  .hero + .content-section .sidebar-card .trend-row{min-height:94px!important;padding:12px 11px!important}
+  .hero + .content-section .feed-column:before{padding:14px 15px 9px!important}
+  .post-card{padding:14px 15px!important;border-bottom:1px solid #eef0f2!important}
+  .post-head{gap:9px!important}
+  .post-author .post-handle{font-size:12px!important;font-weight:800!important}
+  .post-author span{font-size:8px!important}
+  .proof{font-size:6px!important;padding:4px 6px!important;background:#f0f8f4!important}
+  .post-card>p{font-size:13px!important;line-height:1.55!important;margin-top:7px!important}
+  .position-chip{margin-top:2px!important}
+  .post-actions{opacity:.9}
+  .profile-page>.ghost-btn{margin:8px 14px!important}
+  .profile-card{padding:0 15px 15px!important}
+  .profile-top{gap:10px!important}
+  .profile-title h1{font-size:21px!important}
+  .profile-username{font-size:10px!important;color:#667482!important}
+  .profile-stats{gap:15px!important}
+  .profile-tabs{position:sticky!important;top:52px!important;z-index:35!important;background:rgba(255,255,255,.96)!important;backdrop-filter:blur(12px);border-bottom:1px solid #edf0f2!important}
+  .profile-tab{height:48px!important;font-size:10px!important}
+  .profile-grid,.profile-portfolio-section,.profile-proof-section{padding-bottom:8px}
+  .profile-holding-badges-slot{margin-top:6px!important}
+  .profile-holding-badges{gap:4px!important}
+  .profile-holding-badge{height:21px!important;padding-right:6px!important;font-size:6px!important}
+  .profile-holding-badge-mark{width:17px!important;height:17px!important}
+  .sp-mobile-social-bar{position:fixed;display:grid;grid-template-columns:repeat(5,1fr);left:0;right:0;bottom:0;height:56px;z-index:80;background:rgba(255,255,255,.98);border-top:1px solid #e9edf0;box-shadow:0 -6px 20px rgba(15,23,36,.05);padding-bottom:env(safe-area-inset-bottom)}
+  .sp-mobile-social-bar button{border:0;background:none;color:#53606b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:7px;font-weight:700;min-width:0}
+  .sp-mobile-social-bar button:active{background:#f5f7f8}
+  .sp-mobile-social-bar button svg{stroke-width:1.9}
+  footer{display:none!important}
+}
+@media(max-width:430px){
+  .hero h1{font-size:27px!important}
+  .profile-avatar{width:70px!important;height:70px!important}
+  .profile-actions{gap:5px!important}
+  .profile-actions button{padding:7px 10px!important}
+}
