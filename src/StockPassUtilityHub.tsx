@@ -58,8 +58,8 @@ export default function StockPassUtilityHub() {
       .then(({ data, error }) => {
         if (cancelled) return;
         if (!error) setCatalog((data ?? []) as CatalogRow[]);
-      })
-      .finally(() => undefined);
+        setLoadingCatalog(false);
+      });
 
     return () => { cancelled = true; };
   }, [open, catalog.length]);
