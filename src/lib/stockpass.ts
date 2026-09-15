@@ -33,7 +33,7 @@ export async function publishVerifiedPost(input: { wallet: string; position: Ver
   return data;
 }
 
-export async function loadPosts(limit = 30): Promise<FeedPost[]> {
+export async function loadPosts(limit = 120): Promise<FeedPost[]> {
   const { data, error } = await supabase.from('stockpass_posts').select('id, wallet, mint, body, proof_type, created_at').order('created_at', { ascending: false }).limit(limit);
   if (error) throw error;
   return (data ?? []) as FeedPost[];
