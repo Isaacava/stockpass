@@ -6,6 +6,35 @@ import { loadProfile, saveProfile, type StockPassProfile } from './lib/social';
 import StockPassAdditions from './StockPassAdditions';
 import './profile-setup.css';
 
+const discoverUtilityCss = `
+.hero + .content-section{border-top:1px solid var(--sp-line)}
+.hero + .content-section .section-heading{background:#fff}
+.hero + .content-section .feed-grid{display:flex!important;flex-direction:column!important;gap:0!important}
+.hero + .content-section .sidebar-card{order:-1!important;margin:0!important;border:0!important;border-bottom:1px solid var(--sp-line)!important;border-radius:0!important;background:#fbfcfe!important;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:0!important;padding:0!important;overflow:hidden}
+.hero + .content-section .sidebar-card .side-title{grid-column:1/-1;padding:18px 18px 10px!important;border-bottom:1px solid #edf1f5!important;background:#fff!important}
+.hero + .content-section .sidebar-card .side-title:after{content:'Official xStocks prices · live market source';display:block;margin-top:5px;color:#8a97a6;font-size:7px;font-weight:500}
+.hero + .content-section .sidebar-card .trend-row{min-height:106px;padding:14px 13px!important;border-right:1px solid #edf1f5;border-bottom:1px solid #edf1f5;display:grid!important;grid-template-columns:auto 1fr!important;grid-template-rows:auto auto!important;gap:7px 8px!important;background:#fbfcfe!important}
+.hero + .content-section .sidebar-card .trend-row:nth-of-type(3n+1){border-right:0}
+.hero + .content-section .sidebar-card .trend-row .ticker-dot{grid-row:1/3;width:32px;height:32px;display:grid;place-items:center;border-radius:9px;background:#101827;color:#fff;font:800 7px/1 'DM Mono',monospace}
+.hero + .content-section .sidebar-card .trend-row>div:nth-child(2){min-width:0}
+.hero + .content-section .sidebar-card .trend-row strong{display:block;font-size:11px!important;letter-spacing:-.02em}
+.hero + .content-section .sidebar-card .trend-row small{display:block;margin-top:3px;font-size:7px!important;color:#7b8794!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero + .content-section .sidebar-card .trend-price{grid-column:2;display:flex!important;align-items:baseline;justify-content:space-between;gap:6px;width:auto!important;margin:0!important}
+.hero + .content-section .sidebar-card .trend-price b{font:800 13px/1 'DM Mono',monospace;color:#101827}
+.hero + .content-section .sidebar-card .trend-price span{font:700 6px/1 'DM Mono',monospace;color:#19885a}
+.hero + .content-section .feed-column{order:2}
+.hero + .content-section .feed-column:before{content:'VERIFIED ACTIVITY';display:block;padding:18px 18px 10px;border-bottom:1px solid var(--sp-line);font:700 8px/1 'DM Mono',monospace;letter-spacing:.12em;color:#6d7a89}
+@media(max-width:720px){
+  .hero + .content-section .sidebar-card{grid-template-columns:1fr 1fr}
+  .hero + .content-section .sidebar-card .trend-row:nth-of-type(3n+1){border-right:1px solid #edf1f5}
+  .hero + .content-section .sidebar-card .trend-row:nth-of-type(2n+1){border-right:0}
+}
+@media(max-width:480px){
+  .hero + .content-section .sidebar-card{grid-template-columns:1fr}
+  .hero + .content-section .sidebar-card .trend-row{border-right:0!important}
+}
+`;
+
 export default function ProfileSetupGate({ children }: { children: React.ReactNode }) {
   const { address, isConnected } = useAppKitAccount();
   const [profile, setProfile] = useState<StockPassProfile | null>(null);
@@ -63,6 +92,7 @@ export default function ProfileSetupGate({ children }: { children: React.ReactNo
   };
 
   return <>
+    <style>{discoverUtilityCss}</style>
     {children}
     <StockPassAdditions />
     {needsSetup && (
