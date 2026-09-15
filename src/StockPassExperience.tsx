@@ -134,7 +134,7 @@ export default function StockPassExperience() {
 
     <main className="sp3-main">
       {page === 'discover' && <StockPassDiscoverPage onAssetAlert={addAlert} onOpenProfile={() => go('portfolio')} />}
-      {page === 'feed' && <StockPassFeedPage posts={posts} assets={assets} prices={prices} viewerWallet={address} onProfile={() => window.open(profileUrl(address), '_self')} onAlert={addAlert} onCompose={() => setComposerOpen(true)} onSwap={openSwap} />}
+      {page === 'feed' && <StockPassFeedPage posts={posts} assets={assets} prices={prices} viewerWallet={address} onProfile={(wallet) => window.open(profileUrl(wallet), '_self')} onAlert={addAlert} onCompose={() => setComposerOpen(true)} onSwap={openSwap} />}
       {page === 'portfolio' && <PortfolioPage positions={positions} rows={portfolioRows} total={trackedValue} loading={loading} wallet={address} onRefresh={() => void refreshWallet(assets)} onPost={() => setComposerOpen(true)} />}
       {page === 'alerts' && <AlertsPage alerts={alerts} />}
       {page === 'activity' && <ActivityPage notifications={notifications} onRead={() => { void markNotificationsRead(address); setNotifications((items) => items.map((item) => ({ ...item, read_at: item.read_at ?? new Date().toISOString() }))); }} />}
