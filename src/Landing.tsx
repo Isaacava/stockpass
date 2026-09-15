@@ -56,21 +56,21 @@ export default function Landing() {
           <div className="landing-visual" aria-label="StockPass utility workspace preview">
             <div className="proof-window">
               <div className="proof-window-top"><span>STOCKPASS / PORTFOLIO</span><span className="status-chip"><i /> MAINNET LIVE</span></div>
-              <div className="proof-heading"><div><span className="micro-label">PORTFOLIO VALUE</span><strong>$24,860.42</strong></div><span className="proof-record"><ShieldCheck size={13} /> VERIFIED WALLET</span></div>
+              <div className="proof-heading"><div><span className="micro-label">CONNECTED WALLET</span><strong>LIVE XSTOCKS</strong></div><span className="proof-record"><ShieldCheck size={13} /> VERIFIED WALLET</span></div>
               <div className="proof-chart">
                 <div className="grid-lines"><i /><i /><i /><i /></div>
                 <svg viewBox="0 0 520 180" preserveAspectRatio="none" aria-hidden="true"><path d="M0,146 C35,151 53,128 81,135 S124,112 151,118 S197,91 230,103 S272,78 306,85 S347,61 385,70 S429,44 462,50 S495,29 520,21" /></svg>
                 <div className="chart-bubble"><b>LIVE</b><span>official xStocks feed</span></div>
               </div>
               <div className="position-listing">
-                <div><span className="asset-avatar nvda">NV</span><div><b>NVDAx</b><small>Verified balance · mainnet</small></div><strong>$10,440</strong><em>+8.4%</em></div>
-                <div><span className="asset-avatar aapl">AP</span><div><b>AAPLx</b><small>Verified balance · mainnet</small></div><strong>$8,120</strong><em>+3.1%</em></div>
-                <div><span className="asset-avatar spy">SP</span><div><b>SPYx</b><small>Verified balance · mainnet</small></div><strong>$6,300</strong><em>+1.7%</em></div>
+                <div><span className="asset-avatar nvda">NV</span><div><b>NVDAx</b><small>Verified balance · mainnet</small></div><strong>—</strong><em>on connect</em></div>
+                <div><span className="asset-avatar aapl">AP</span><div><b>AAPLx</b><small>Verified balance · mainnet</small></div><strong>—</strong><em>on connect</em></div>
+                <div><span className="asset-avatar spy">SP</span><div><b>SPYx</b><small>Verified balance · mainnet</small></div><strong>—</strong><em>on connect</em></div>
               </div>
-              <div className="proof-window-footer"><span><LockKeyhole size={12} /> Solana mainnet source of truth</span><b>Balances verified</b></div>
+              <div className="proof-window-footer"><span><LockKeyhole size={12} /> Solana mainnet source of truth</span><b>Balances verified after connect</b></div>
             </div>
-            <div className="float-card float-card-top"><span className="float-label">PRICE ALERT</span><b>NVDAx crossed your target.</b><span className="float-proof"><Check size={12} /> Alert ready</span></div>
-            <div className="float-card float-card-bottom"><span className="float-label">PROOF SNAPSHOT</span><b>A position was verified at a specific slot and timestamp.</b><div className="signal-people"><span>✓</span><span>SP</span><span>TX</span><i>LIVE</i></div></div>
+            <div className="float-card float-card-top"><span className="float-label">PRICE ALERT</span><b>Set a target for any supported xStock.</b><span className="float-proof"><Check size={12} /> Mainnet-aware</span></div>
+            <div className="float-card float-card-bottom"><span className="float-label">PROOF SNAPSHOT</span><b>A position is verified at a specific slot and timestamp.</b><div className="signal-people"><span>✓</span><span>SP</span><span>TX</span><i>LIVE</i></div></div>
           </div>
         </section>
 
