@@ -30,6 +30,7 @@ StockPass combines three layers:
 - Public profile **Posts** tab for proof-backed posts.
 - Public profile **Portfolio** tab showing every supported xStock currently held by that wallet, read directly from Solana mainnet and paired with live xStock prices when available.
 - Public profile **Proof** tab explaining the wallet verification model and showing current proof statistics.
+- Public profile **holding badges**: current positive-balance xStocks are displayed next to the user's name as compact ticker badges, with overflow collapsed into a `+N` indicator.
 - Portfolio verification view for the connected wallet.
 - Workspace utility panel showing live supported xStock holdings, estimated live value when prices are available, optional PnL, and Telegram alert connection.
 - Alert persistence.
@@ -38,6 +39,14 @@ StockPass combines three layers:
 - Utility-first landing page focused on portfolio, mainnet proof, market context, alerts and future signed actions.
 - Landing preview avoids fake wallet balances; live balances appear after wallet connection.
 - Landing page is the default disconnected experience; the full workspace is lazy-loaded only after a wallet connects so workspace imports cannot block the public landing page.
+
+## xStock catalog
+
+StockPass now keeps a dedicated `stockpass_xstock_catalog` table for the official xStocks utility catalog. The catalog stores the symbol, name, Solana mint, network, verification/badge flags, source and logo metadata.
+
+The live xStocks public API query used for `network=Solana` returned **732 unique Solana xStock assets** at the time of this build. Those 732 assets were inserted into both `stockpass_xstock_catalog` and the existing `stockpass_assets` table. The public xStocks products page currently shows a different global product count, so StockPass does not hardcode the previously assumed 810 count; the network-filtered API catalog is the database source used for Solana holdings and badges.
+
+This catalog is the product allowlist, while individual wallet badges are earned dynamically only when the wallet has a positive onchain balance for that official Solana xStock mint.
 
 ## Additions from the StockPass additions pack
 
@@ -60,6 +69,7 @@ The UI emphasizes:
 - market context beside wallet state
 - fast wallet/profile navigation
 - profile identity built around display name + @username, with wallet address as verifiable secondary identity
+- live xStock holding badges attached to the public profile identity
 - profile sections that combine social content with the user's live supported xStock holdings
 - fast switching between Posts, Portfolio and Proof without leaving the public profile
 - compact information density without clutter
@@ -76,7 +86,7 @@ There is no devnet trading environment, simulated portfolio balance or fake exec
 
 Any supported buy, sell or swap will eventually be a real Solana mainnet transaction signed by the connected wallet, with the resulting transaction signature and confirmed wallet state available for verification.
 
-The public profile portfolio and workspace utility view also follow this invariant: xStock balances are not copied from Supabase or manually entered profile data. They are read from the wallet's supported Solana token accounts.
+The public profile portfolio and workspace utility view also follow this invariant: xStock balances are not copied from Supabase or manually entered profile data. They are read from the wallet's supported Solana token accounts. The database catalogs official mint metadata; it does not manufacture holdings.
 
 ## Database/security
 
@@ -108,4 +118,5 @@ PnL requires a Birdeye API key. The current helper uses `VITE_BIRDEYE_API_KEY` f
 8. Milestone-generated post drafts from verified portfolio events.
 9. Improve Discover with first-class profile identities, following-aware feeds and search/discovery.
 10. Add richer asset-level utility views: holdings history, transaction provenance and a dedicated supported-xStock market screen.
-11. Judge-flow testing from wallet connection → profile setup → utility → proof → portfolio → trade → PnL → post → follow → notification → public profile.
+11. Keep the official xStock catalog synchronized as new Solana assets are issued or retired.
+12. Judge-flow testing from wallet connection → profile setup → utility → proof → portfolio → trade → PnL → post → follow → notification → public profile.
