@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Bell, Check, ExternalLink, Link2, ShieldCheck, TrendingUp, WalletCards, X } from 'lucide-react';
+import { Bell, Check, ExternalLink, Link2, ShieldCheck, WalletCards, X } from 'lucide-react';
 import { useAppKitAccount } from '@reown/appkit/react';
 import { useConnection } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { STOCKS, type StockAsset } from './lib/assets';
 import { fetchOfficialPrices, resolveOfficialStocks } from './lib/xstocks';
 import { readStockPositions, type VerifiedPosition } from './lib/solana';
-import { fetchPortfolioPnl, sumPortfolioPnl, type TokenPnl } from './lib/pnl';
+import { fetchXStockPortfolioValue, sumXStockValue, type XStockPortfolioRow } from './lib/xstockPortfolio';
 import { isTelegramLinked, telegramConnectUrl, TELEGRAM_BOT_USERNAME } from './lib/telegram';
 import StockPassDiscoverMarket from './StockPassDiscoverMarket';
 import './additions.css';
@@ -16,10 +16,10 @@ export default function StockPassAdditions() {
   const { connection } = useConnection();
   const [open, setOpen] = useState(false);
   const [telegramLinked, setTelegramLinked] = useState(false);
-  const [pnl, setPnl] = useState<TokenPnl[]>([]);
   const [assets, setAssets] = useState<StockAsset[]>([]);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [positions, setPositions] = useState<VerifiedPosition[]>([]);
+  const [portfolio, setPortfolio] = useState<XStockPortfolioRow[]>([]);
   const [loadingPortfolio, setLoadingPortfolio] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -31,21 +31,20 @@ export default function StockPassAdditions() {
         const official = await resolveOfficialStocks(STOCKS);
         const livePrices = await fetchOfficialPrices(official);
         const rows = await readStockPositions(connection, new PublicKey(address), official);
+        const valuation = await fetchXStockPortfolioValue(rows.filter((row) => row.balance > 0), official);
         if (!cancelled) {
           setAssets(official);
           setPrices(livePrices);
           setPositions(rows);
+          setPortfolio(valuation);
         }
-        if (TELEGRAM_BOT_USERNAME) {
-          const linked = await isTelegramLinked(address);
-          if (!cancelled) setTelegramLinked(linked);
+        if (TELEGRAM_BOT_USERNAME && !cancelled) {
+          setTelegramLinked(await isTelegramLinked(address));
         }
-        const pnlRows = await fetchPortfolioPnl(address);
-        if (!cancelled) setPnl(pnlRows);
       } catch {
         if (!cancelled) {
           setPositions([]);
-          setPnl([]);
+          setPortfolio([]);
         }
       }
     })();
@@ -61,10 +60,12 @@ export default function StockPassAdditions() {
         const official = assets.length ? assets : await resolveOfficialStocks(STOCKS);
         const livePrices = Object.keys(prices).length ? prices : await fetchOfficialPrices(official);
         const rows = await readStockPositions(connection, new PublicKey(address), official);
+        const valuation = await fetchXStockPortfolioValue(rows.filter((row) => row.balance > 0), official);
         if (!cancelled) {
           setAssets(official);
           setPrices(livePrices);
           setPositions(rows);
+          setPortfolio(valuation);
         }
       } catch {
         if (!cancelled) setPositions([]);
@@ -75,15 +76,11 @@ export default function StockPassAdditions() {
     return () => { cancelled = true; };
   }, [open, address, connection]);
 
-  const holdingValue = useMemo(() => positions.reduce((sum, position) => {
-    const price = prices[position.symbol];
-    return sum + (price ? position.balance * price : 0);
-  }, 0), [positions, prices]);
+  const holdingValue = useMemo(() => sumXStockValue(portfolio), [portfolio]);
 
-  if (!address || (!TELEGRAM_BOT_USERNAME && pnl.length === 0 && assets.length === 0 && positions.length === 0)) return <StockPassDiscoverMarket />;
+  if (!address || (!TELEGRAM_BOT_USERNAME && assets.length === 0 && positions.length === 0)) return <StockPassDiscoverMarket />;
 
   const telegramUrl = telegramConnectUrl(address);
-  const totalPnl = sumPortfolioPnl(pnl);
 
   const connectTelegram = () => {
     if (!telegramUrl) return;
@@ -107,24 +104,25 @@ export default function StockPassAdditions() {
             <div className="sp-additions-head">
               <div>
                 <span className="sp-additions-label">STOCKPASS UTILITY</span>
-                <strong>Live wallet tools</strong>
+                <strong>Live xStock wallet tools</strong>
               </div>
               <button className="sp-additions-close" onClick={() => setOpen(false)} aria-label="Close"><X size={14} /></button>
             </div>
 
             <div className="sp-tool-summary">
-              <div><span>Supported xStocks held</span><b>{loadingPortfolio ? '…' : positions.length}</b></div>
+              <div><span>Supported xStocks held</span><b>{loadingPortfolio ? '…' : portfolio.length}</b></div>
               <div><span>Live estimated value</span><b>{holdingValue > 0 ? `$${holdingValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</b></div>
             </div>
 
-            {positions.length > 0 && (
+            {portfolio.length > 0 && (
               <div className="sp-holdings-mini">
-                {positions.slice(0, 4).map((position) => {
-                  const price = prices[position.symbol];
-                  const value = price ? position.balance * price : null;
-                  return <div className="sp-holding-mini" key={position.mint}>
-                    <span className="sp-holding-icon">{position.icon}</span>
-                    <div><strong>{position.symbol}</strong><small>{position.balance.toLocaleString()} held</small></div>
+                {portfolio.slice(0, 4).map((row) => {
+                  const position = positions.find((item) => item.mint === row.mint);
+                  const price = prices[row.symbol] ?? row.priceUsd;
+                  const value = row.valueUsd;
+                  return <div className="sp-holding-mini" key={row.mint}>
+                    <span className="sp-holding-icon">{position?.icon ?? '•'}</span>
+                    <div><strong>{row.symbol}</strong><small>{row.holding.toLocaleString()} held · {price !== null && price !== undefined ? `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : 'price unavailable'}</small></div>
                     <b>{value !== null ? `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : '—'}</b>
                   </div>;
                 })}
@@ -142,24 +140,13 @@ export default function StockPassAdditions() {
               </div>
             )}
 
-            {pnl.length > 0 && (
-              <div className="sp-tool-row">
-                <div className="sp-tool-icon"><TrendingUp size={15} /></div>
-                <div className="sp-tool-copy">
-                  <strong>xStock PnL</strong>
-                  <span>{pnl.length} tracked position{pnl.length === 1 ? '' : 's'} from the configured xStock universe.</span>
-                </div>
-                <span className={totalPnl >= 0 ? 'sp-pnl positive' : 'sp-pnl negative'}>{totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}</span>
-              </div>
-            )}
-
-            {positions.length === 0 && !loadingPortfolio && (
+            {portfolio.length === 0 && !loadingPortfolio && (
               <div className="sp-utility-empty"><WalletCards size={15} /><span>No supported xStock balance detected for this wallet.</span></div>
             )}
 
-            <a className="sp-additions-foot" href="https://github.com/Isaacava/stockpass" target="_blank" rel="noreferrer">
-              Mainnet wallet state remains the source of truth. <ExternalLink size={11} />
-            </a>
+            <div className="sp-additions-foot">
+              Mainnet xStock wallet state and official xStocks public market data remain the source of truth. <ExternalLink size={11} />
+            </div>
           </div>
         )}
 
