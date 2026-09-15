@@ -41,6 +41,8 @@ StockPass combines three layers:
 - New **Supabase session propagation**: the opaque signed-wallet session is attached to PostgREST requests without replacing Supabase's normal publishable-key Authorization header.
 - New **wallet-scoped RLS**: all StockPass tables now have RLS enabled. Public catalog/profile/feed tables retain public-read policies; wallet-owned records require the active signed wallet session. Wallet auth challenge/session rows remain server-only and have no browser policies.
 - New **Discover identity resolution**: feed posts now resolve each unique author wallet against `stockpass_profiles` and pass the saved display name plus `@username` into post cards, while retaining the wallet/profile navigation fallback for accounts without a profile.
+- New **connected-workspace Market mount**: the StockPass Market Utility is now mounted alongside the main workspace rather than existing as an unused component, so the 732-asset catalog, asset detail, proof, alert and provenance surface is reachable from the connected app.
+- New **server-side PnL proxy**: StockPass PnL requests now go through the `stockpass-pnl` Supabase Edge Function instead of exposing a Birdeye API key in the browser. The proxy uses Birdeye's current `token_addresses` parameter and WAC PnL method, while limiting requests to StockPass-approved xStock mints. The API key is read only from the Edge Function environment.
 - Mobile navigation and responsive layouts.
 - Social timeline visual language inspired by modern consumer feeds: name + @username identity, flat timeline posts, profile tabs, follow actions and compact proof indicators, while retaining original StockPass styling and terminology.
 - Utility-first landing page focused on portfolio, mainnet proof, market context, alerts and future signed actions.
@@ -72,10 +74,11 @@ These tables are data foundations only; they do not create simulated balances or
 - Telegram deep-link client helper.
 - Telegram webhook Edge Function source with webhook-secret validation and Solana-address validation.
 - Scheduled price-alert worker source using Jupiter Price API, in-app activity events and optional Telegram delivery.
-- xStock-scoped portfolio PnL helper using Birdeye's Wallet PnL endpoint.
+- xStock-scoped portfolio PnL helper originally supplied as a browser-side Birdeye integration.
 - Compact connected-workspace tools panel that exposes Telegram alerts and PnL when the corresponding integrations are configured.
+- The PnL browser key exposure has now been removed: the client calls `stockpass-pnl`, and the Birdeye key belongs in Supabase secrets instead.
 
-The Telegram migration has been applied to the existing StockPass Supabase project. The Edge Functions are committed to the repository; Telegram delivery still requires the user-provided bot secrets and scheduled invocation. The PnL browser helper is optional; for production the Birdeye key should be moved behind a server-side Edge Function rather than exposed to the browser.
+The Telegram migration has been applied to the existing StockPass Supabase project. The Telegram Edge Functions remain source-only until bot credentials and scheduling are configured. The `stockpass-pnl` Edge Function is now deployed; it returns a clear configuration error until `BIRDEYE_API_KEY` is supplied as a Supabase secret.
 
 ## UX principles
 
@@ -124,22 +127,20 @@ Telegram delivery requires:
 - deployed `telegram-webhook` and `alerts-worker` Edge Functions
 - a scheduled worker invocation
 
-PnL requires a Birdeye API key. The current helper uses `VITE_BIRDEYE_API_KEY` for the hackathon path; production should proxy this through a server-side Edge Function.
+PnL requires a `BIRDEYE_API_KEY` Supabase secret for the new `stockpass-pnl` Edge Function.
 
 ## Current next targets
 
 1. Validate the new buy/sell/receive/send activity decoder against real mainnet transactions and tune false-positive boundaries.
-2. Wire `stockpass_trade_intents` into a real wallet-signed mainnet quote/submit/confirm flow; no simulated execution.
-3. Derive durable cost basis and realized/unrealized PnL from transaction/provenance history and persist snapshots server-side.
-4. Detect position reductions/sells and create seller-proof records tied to confirmed signatures.
-5. Deploy and schedule the StockPass alerts worker once required secrets/scheduling are available.
-6. Finish Telegram connection UX and notification settings.
-7. Generate milestone post drafts from verified portfolio events.
-8. Upgrade Discover into a first-class 732-asset xStock discovery experience with following-aware feed tabs, search and direct asset navigation.
-9. Expand the Market utility hub into dedicated asset screens with charts, provenance, holder context and action receipts.
-10. Keep the official xStock catalog synchronized as new Solana assets are issued or retired.
-11. Judge-flow testing from wallet connection → signature verification → profile setup → market utility → proof → portfolio → action → PnL → post → follow → notification → public profile.
+2. Build the remaining Telegram connection/settings UX and notification controls.
+3. Deploy the StockPass alerts worker once the required bot/Jupiter secrets and schedule are available.
+4. Derive durable cost basis and realized/unrealized PnL from transaction/provenance history and persist snapshots server-side.
+5. Detect position reductions/sells and create seller-proof records tied to confirmed signatures.
+6. Upgrade Discover into a first-class 732-asset xStock discovery experience with following-aware feed tabs, search and direct asset navigation.
+7. Expand the Market utility hub into dedicated asset screens with charts, provenance, holder context and action receipts.
+8. Keep the official xStock catalog synchronized as new Solana assets are issued or retired.
+9. Judge-flow testing from wallet connection → signature verification → profile setup → market utility → proof → portfolio → alerts/Telegram → PnL → post → follow → notification → public profile.
 
 ## Build verification
 
-Production currently has a READY deployment for commit `85c97b8fb926ff57ac08a20a0944527a1755647a` (`dpl_J5dGnrh5mw8arRUy63vc3S5kQ8p4`). This activity-classification commit will trigger the next production deployment automatically.
+The latest StockPass production deployment before the PnL hardening is `dpl_7zS63EZjNSanzqcmQiikNXBhgPvp`, triggered by the workspace-market mount. The PnL hardening commits are now on `main`, and Vercel should create the next production deployment automatically.
