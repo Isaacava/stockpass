@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { AppKitButton, useAppKitAccount } from '@reown/appkit/react';
 import { useConnection } from '@solana/wallet-adapter-react';
@@ -8,7 +8,7 @@ import { fetchOfficialPrices, resolveOfficialStocks } from './lib/xstocks';
 import { fetchXStockPortfolioValue, sumXStockValue, type XStockPortfolioRow } from './lib/xstockPortfolio';
 import { readStockPositions, shortAddress, type VerifiedPosition } from './lib/solana';
 import { createPriceAlert, ensureProfile, loadAlerts, loadNotifications, loadPosts, publishVerifiedPost, type FeedPost } from './lib/stockpass';
-import { loadProfile, loadFollowCounts, loadNotifications as loadSocialNotifications, markNotificationsRead, profileUrl, type StockPassNotification, type StockPassProfile } from './lib/social';
+import { markNotificationsRead, profileUrl, type StockPassNotification } from './lib/social';
 import StockPassDiscoverPage from './StockPassDiscoverPage';
 import StockPassFeedPage from './StockPassFeedPage';
 import './stockpass-redesign.css';
@@ -17,7 +17,8 @@ type Page = 'discover' | 'feed' | 'portfolio' | 'alerts' | 'activity';
 type AlertRow = { id: string; symbol: string; direction: 'above' | 'below'; target: number; active: boolean; mint: string | null };
 
 export default function StockPassExperience() {
-  const { address, isConnected } = useAppKitAccount();
+  const { address: connectedAddress, isConnected } = useAppKitAccount();
+  const address = connectedAddress ?? '';
   const { connection } = useConnection();
   const [page, setPage] = useState<Page>('discover');
   const [assets, setAssets] = useState<StockAsset[]>(STOCKS);
@@ -53,17 +54,17 @@ export default function StockPassExperience() {
     }
   }, [address, connection]);
 
-  const refreshSocial = useCallback(async () => {
+  const refreshSocial = useCallback(async (official: StockAsset[]) => {
     if (!address) return;
     await ensureProfile(address);
-    const [nextPosts, nextAlerts, nextNotifications] = await Promise.all([loadPosts(), loadAlerts(address), loadSocialNotifications(address)]);
+    const [nextPosts, nextAlerts, nextNotifications] = await Promise.all([loadPosts(), loadAlerts(address), loadNotifications(address)]);
     setPosts(nextPosts);
-    setAlerts(nextAlerts.map((row) => ({ id: row.id as string, symbol: assets.find((asset) => asset.mint === row.mint)?.symbol ?? 'xStock', direction: row.direction as 'above' | 'below', target: Number(row.target_price), active: Boolean(row.active), mint: row.mint as string | null })));
+    setAlerts(nextAlerts.map((row) => ({ id: row.id as string, symbol: official.find((asset) => asset.mint === row.mint)?.symbol ?? 'xStock', direction: row.direction as 'above' | 'below', target: Number(row.target_price), active: Boolean(row.active), mint: row.mint as string | null })));
     setNotifications(nextNotifications);
-  }, [address, assets]);
+  }, [address]);
 
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected || !address) {
       setLoading(false);
       return;
     }
@@ -72,7 +73,7 @@ export default function StockPassExperience() {
       try {
         const official = await refresh();
         if (cancelled) return;
-        await Promise.all([refreshWallet(official), refreshSocial()]);
+        await Promise.all([refreshWallet(official), refreshSocial(official)]);
       } catch {
         if (!cancelled) setToast('Some live StockPass data could not be loaded.');
       } finally {
@@ -80,7 +81,7 @@ export default function StockPassExperience() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isConnected, refresh, refreshWallet, refreshSocial]);
+  }, [isConnected, address, refresh, refreshWallet, refreshSocial]);
 
   useEffect(() => {
     if (!toast) return;
@@ -111,7 +112,7 @@ export default function StockPassExperience() {
     const slot = await connection.getSlot('confirmed');
     await publishVerifiedPost({ wallet: address, position, slot, body });
     setPosts(await loadPosts());
-    setNotifications(await loadSocialNotifications(address));
+    setNotifications(await loadNotifications(address));
     setComposerOpen(false);
     setToast('Published with fresh mainnet proof.');
     go('feed');
@@ -152,7 +153,7 @@ function DisconnectedLanding() {
 }
 
 function PortfolioPage({ positions, rows, total, loading, wallet, onRefresh, onPost }: { positions: VerifiedPosition[]; rows: XStockPortfolioRow[]; total: number; loading: boolean; wallet: string; onRefresh: () => void; onPost: () => void }) {
-  return <div className="sp3-content"><section className="sp3-page-heading"><div><div className="sp3-kicker">YOUR WALLET</div><h1>Portfolio</h1><p>Only xStocks currently held by your Solana wallet appear here.</p></div><div className="sp3-heading-actions"><button className="sp3-secondary" onClick={onRefresh}>Refresh holdings</button><button className="sp3-primary" onClick={onPost} disabled={!positions.length}><PenLine size={14} /> Post proof</button></div></section><section className="sp3-stat-grid"><Stat label="Tracked xStock value" value={total ? `$${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'} /><Stat label="xStocks held" value={loading ? '…' : String(positions.length)} /><Stat label="Wallet" value={`${shortAddress(wallet)}`} /></section><section className="sp3-panel"><div className="sp3-panel-head"><div><strong>Verified holdings</strong><span>Live Solana mainnet balances + official xStocks prices</span></div><ShieldCheck size={17} /></div>{rows.length ? <div className="sp3-holding-list">{rows.map((row) => <div className="sp3-holding" key={row.mint}><span className="sp3-holding-symbol">{row.symbol.replace(/x$/i, '').slice(0, 4)}</span><div><strong>{row.symbol}</strong><span>{row.holding.toLocaleString()} held</span></div><div className="sp3-holding-price"><strong>{row.priceUsd ? `$${row.priceUsd.toFixed(2)}` : '—'}</strong><span>{row.valueUsd ? `$${row.valueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })} value` : 'Price unavailable'}</span></div></div>)}</div> : <div className="sp3-empty"><CircleUserRound size={20} /><strong>No supported xStocks held</strong><span>When the connected wallet holds a verified xStock, it will appear here automatically.</span></div>}</section></div>;
+  return <div className="sp3-content"><section className="sp3-page-heading"><div><div className="sp3-kicker">YOUR WALLET</div><h1>Portfolio</h1><p>Only xStocks currently held by your Solana wallet appear here.</p></div><div className="sp3-heading-actions"><button className="sp3-secondary" onClick={onRefresh}>Refresh holdings</button><button className="sp3-primary" onClick={onPost} disabled={!positions.length}><PenLine size={14} /> Post proof</button></div></section><section className="sp3-stat-grid"><Stat label="Tracked xStock value" value={total ? `$${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'} /><Stat label="xStocks held" value={loading ? '…' : String(positions.length)} /><Stat label="Wallet" value={shortAddress(wallet)} /></section><section className="sp3-panel"><div className="sp3-panel-head"><div><strong>Verified holdings</strong><span>Live Solana mainnet balances + official xStocks prices</span></div><ShieldCheck size={17} /></div>{rows.length ? <div className="sp3-holding-list">{rows.map((row) => <div className="sp3-holding" key={row.mint}><span className="sp3-holding-symbol">{row.symbol.replace(/x$/i, '').slice(0, 4)}</span><div><strong>{row.symbol}</strong><span>{row.holding.toLocaleString()} held</span></div><div className="sp3-holding-price"><strong>{row.priceUsd ? `$${row.priceUsd.toFixed(2)}` : '—'}</strong><span>{row.valueUsd ? `$${row.valueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })} value` : 'Price unavailable'}</span></div></div>)}</div> : <div className="sp3-empty"><CircleUserRound size={20} /><strong>No supported xStocks held</strong><span>When the connected wallet holds a verified xStock, it will appear here automatically.</span></div>}</section></div>;
 }
 
 function Stat({ label, value }: { label: string; value: string }) { return <div className="sp3-stat"><span>{label}</span><strong>{value}</strong></div>; }
