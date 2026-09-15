@@ -5,6 +5,7 @@ import type { FeedPost } from './lib/stockpass';
 import { fetchOfficialPriceSignals, type XStockSignal } from './lib/xstocks';
 import { loadFollowingWallets, loadProfile, profileUrl, shortWallet, type StockPassProfile } from './lib/social';
 import './feed-swap.css';
+import './feed-twitter.css';
 
 type FeedTab = 'general' | 'stocks' | 'following';
 
@@ -68,7 +69,6 @@ export default function StockPassFeedPage({ posts, assets, prices, viewerWallet,
   const followingSet = useMemo(() => new Set(following), [following]);
   const heldSet = useMemo(() => new Set(heldMints), [heldMints]);
   const displayed = useMemo(() => {
-    const verified = posts.filter((post) => post.proof_type !== 'demo_social' && Boolean(post.mint));
     if (tab === 'stocks') return posts.filter((post) => Boolean(post.mint) && heldSet.has(post.mint));
     if (tab === 'following') return posts.filter((post) => followingSet.has(post.wallet));
     return posts;
@@ -147,8 +147,8 @@ function FeedCard({ post, asset, signal, fallbackPrice, profile, isFollowing, on
       <div className="sp2-post-actions" aria-label="Post actions">
         <button onClick={() => onProfile(post.wallet)}><MessageCircle size={15} /><span>View</span></button>
         <button onClick={() => void copy()}><Repeat2 size={15} /><span>Share</span></button>
-        <button onClick={() => onAlert(asset?.symbol ?? '')} disabled={!asset}><Bell size={15} /><span>Alert</span></button>
-        <button onClick={() => onSwap(asset?.symbol ?? '')} disabled={!asset}><ArrowUpRight size={15} /><span>Swap</span></button>
+        <button onClick={() => asset && onAlert(asset.symbol)} disabled={!asset}><Bell size={15} /><span>Alert</span></button>
+        <button onClick={() => asset && onSwap(asset.symbol)} disabled={!asset}><ArrowUpRight size={15} /><span>Swap</span></button>
         <button onClick={() => onProfile(post.wallet)} className="sp2-like-button"><Heart size={15} /><span>{isFollowing ? 'Following' : 'Profile'}</span></button>
       </div>
     </div>
