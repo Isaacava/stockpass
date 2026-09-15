@@ -48,7 +48,7 @@ export default function StockPassUtilityHub() {
     if (!open || catalog.length) return;
     let cancelled = false;
     setLoadingCatalog(true);
-    supabase
+    void supabase
       .from('stockpass_xstock_catalog')
       .select('symbol,name,solana_mint,network,is_verified,badge_enabled,logo_url')
       .eq('network', 'Solana')
@@ -59,7 +59,8 @@ export default function StockPassUtilityHub() {
         if (cancelled) return;
         if (!error) setCatalog((data ?? []) as CatalogRow[]);
       })
-      .finally(() => !cancelled && setLoadingCatalog(false));
+      .finally(() => undefined);
+
     return () => { cancelled = true; };
   }, [open, catalog.length]);
 
