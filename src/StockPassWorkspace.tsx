@@ -1,11 +1,5 @@
-import StockPassApp from './StockPassApp';
-import StockPassUtilityHub from './StockPassUtilityHub';
+import StockPassExperience from './StockPassExperience';
 
 export default function StockPassWorkspace() {
-  return (
-    <>
-      <StockPassApp />
-      <StockPassUtilityHub />
-    </>
-  );
+  return <StockPassExperience />;
 }
