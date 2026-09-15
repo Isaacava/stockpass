@@ -45,6 +45,12 @@ export async function loadFollowCounts(wallet: string) {
   return { followers: followers ?? 0, following: following ?? 0 };
 }
 
+export async function loadFollowingWallets(wallet: string) {
+  const { data, error } = await supabase.from('stockpass_follows').select('followed_wallet').eq('follower_wallet', wallet);
+  if (error) throw error;
+  return (data ?? []).map((row) => String(row.followed_wallet)).filter(Boolean);
+}
+
 export async function isFollowing(followerWallet: string, followedWallet: string) {
   const { data, error } = await supabase.from('stockpass_follows').select('follower_wallet').eq('follower_wallet', followerWallet).eq('followed_wallet', followedWallet).maybeSingle();
   if (error) throw error;
