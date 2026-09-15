@@ -34,7 +34,7 @@ StockPass combines three layers:
 - Portfolio verification view for the connected wallet.
 - Workspace utility panel showing live supported xStock holdings, estimated live value when prices are available, optional PnL, and Telegram alert connection.
 - New **Market utility hub** available from the connected workspace: searchable verified Solana xStock catalog, per-asset live price lookup, official Solana mint, current connected-wallet balance, alert creation, and saved provenance-event history.
-- New **mainnet xStock activity sync**: reads recent confirmed wallet transactions, detects supported xStock balance changes, records increase/decrease events with slots, block times and confirmed transaction signatures, and exposes a manual `Sync mainnet` action in the Market utility.
+- New **mainnet xStock activity sync**: reads recent confirmed wallet transactions, detects supported xStock balance changes, and records them with slots, block times and confirmed transaction signatures. The decoder now conservatively classifies an xStock increase/decrease as `buy`/`sell` only when an opposite wallet-owned token movement or native-SOL payment movement exists in the same transaction; otherwise it records `receive`/`send`. Classification metadata is stored as inferred rather than presented as a guaranteed protocol-level trade fact.
 - New **mainnet proof receipt**: a positive xStock holding can be saved as a timestamped `stockpass_verification_snapshots` record with the current confirmed slot, and the utility can copy a human-readable proof receipt.
 - New **wallet-signature authentication**: a 5-minute challenge message, Ed25519/NaCl signature verification in a Supabase Edge Function, one-use challenge protection and a 7-day opaque wallet session stored server-side as a SHA-256 token hash.
 - New **connected-wallet auth gate**: the workspace now waits for a real Solana wallet `signMessage` verification before loading profile/workspace data. Signing is explicitly non-transactional.
@@ -128,7 +128,7 @@ PnL requires a Birdeye API key. The current helper uses `VITE_BIRDEYE_API_KEY` f
 
 ## Current next targets
 
-1. Expand the recent Solana activity decoder from generic increase/decrease events into buy/sell/receive/send classifications when transaction instructions allow reliable attribution.
+1. Validate the new buy/sell/receive/send activity decoder against real mainnet transactions and tune false-positive boundaries.
 2. Wire `stockpass_trade_intents` into a real wallet-signed mainnet quote/submit/confirm flow; no simulated execution.
 3. Derive durable cost basis and realized/unrealized PnL from transaction/provenance history and persist snapshots server-side.
 4. Detect position reductions/sells and create seller-proof records tied to confirmed signatures.
@@ -142,4 +142,4 @@ PnL requires a Birdeye API key. The current helper uses `VITE_BIRDEYE_API_KEY` f
 
 ## Build verification
 
-The latest production Vercel deployment triggered by the RLS commit is `dpl_EvaR5je6kGsvvDURcTxXd1SLJwxK` and completed without a TypeScript/Vite compilation failure. Its error-only output contained only npm install-script approval warnings and a Rollup annotation warning.
+Production currently has a READY deployment for commit `85c97b8fb926ff57ac08a20a0944527a1755647a` (`dpl_J5dGnrh5mw8arRUy63vc3S5kQ8p4`). This activity-classification commit will trigger the next production deployment automatically.
