@@ -1,10 +1,12 @@
-import { fetchOfficialPrices } from './xstocks';
+import { fetchOfficialMultipliers, fetchOfficialPrices } from './xstocks';
 import type { StockAsset } from './assets';
 import type { VerifiedPosition } from './solana';
 
 export type XStockPortfolioRow = {
   mint: string;
   symbol: string;
+  rawHolding: number;
+  multiplier: number;
   holding: number;
   priceUsd: number | null;
   valueUsd: number | null;
@@ -15,16 +17,23 @@ export async function fetchXStockPortfolioValue(
   assets: StockAsset[]
 ): Promise<XStockPortfolioRow[]> {
   const supported = assets.filter((asset) => positions.some((position) => position.mint === asset.mint));
-  const prices = await fetchOfficialPrices(supported);
+  const [prices, multipliers] = await Promise.all([
+    fetchOfficialPrices(supported),
+    fetchOfficialMultipliers(supported)
+  ]);
 
   return positions.map((position) => {
     const price = Number.isFinite(prices[position.symbol]) ? prices[position.symbol] : null;
+    const multiplier = Number.isFinite(multipliers[position.symbol]) ? multipliers[position.symbol] : 1;
+    const holding = position.balance * multiplier;
     return {
       mint: position.mint,
       symbol: position.symbol,
-      holding: position.balance,
+      rawHolding: position.balance,
+      multiplier,
+      holding,
       priceUsd: price,
-      valueUsd: price === null ? null : position.balance * price
+      valueUsd: price === null ? null : holding * price
     };
   });
 }
