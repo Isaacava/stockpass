@@ -28,7 +28,24 @@ type PositionEvent = {
   transaction_signature: string | null;
   block_time: string | null;
   created_at: string;
+  metadata?: { classification?: string; confidence?: string; basis?: string } | null;
 };
+
+function eventLabel(event: PositionEvent) {
+  const classification = event.metadata?.classification;
+  if (classification === 'inferred_buy') return 'Buy · inferred';
+  if (classification === 'inferred_sell') return 'Sell · inferred';
+  if (classification === 'receive') return 'Receive';
+  if (classification === 'send') return 'Send';
+  return event.event_type;
+}
+
+function eventConfidence(event: PositionEvent) {
+  const confidence = event.metadata?.confidence;
+  if (confidence === 'high') return 'Instruction-backed';
+  if (confidence === 'medium') return 'Balance-backed';
+  return null;
+}
 
 export default function StockPassUtilityHub() {
   const { address } = useAppKitAccount();
@@ -81,7 +98,7 @@ export default function StockPassUtilityHub() {
   const loadEvents = async (wallet: string, mint: string) => {
     const { data } = await supabase
       .from('stockpass_position_events')
-      .select('id,symbol,event_type,quantity_delta,transaction_signature,block_time,created_at')
+      .select('id,symbol,event_type,quantity_delta,transaction_signature,block_time,created_at,metadata')
       .eq('wallet', wallet)
       .eq('mint', mint)
       .order('created_at', { ascending: false })
@@ -226,15 +243,15 @@ export default function StockPassUtilityHub() {
           <div><span>Your balance</span><strong>{selectedPosition ? selectedPosition.balance.toLocaleString() : '0'}</strong></div>
           <div><span>Mint</span><strong>{selected.solana_mint ? `${selected.solana_mint.slice(0, 5)}…${selected.solana_mint.slice(-5)}` : 'Unavailable'}</strong></div>
         </div>
-        <div className="sp-asset-actions"><button onClick={() => void createAlert()}><Bell size={14} /> Set alert</button><button onClick={() => setMessage('Trading rail is being connected to wallet-signed mainnet execution.')}><TrendingUp size={14} /> Action</button></div>
+        <div className="sp-asset-actions"><button onClick={() => void createAlert()}><Bell size={14} /> Set alert</button><button onClick={() => setMessage('Action surface is reserved for confirmed wallet-signed mainnet execution.')}><TrendingUp size={14} /> Action</button></div>
         {selectedPosition && <div className="sp-proof-receipt">
           <div className="sp-proof-receipt-head"><div><span className="sp-utility-eyebrow">MAINNET PROOF</span><strong>Current ownership receipt</strong></div><FileCheck2 size={16} /></div>
           <div className="sp-proof-receipt-grid"><div><span>Asset</span><strong>{selected.symbol}</strong></div><div><span>Balance</span><strong>{selectedPosition.balance.toLocaleString()}</strong></div><div><span>Mint</span><strong>{selectedPosition.mint.slice(0, 5)}…{selectedPosition.mint.slice(-5)}</strong></div></div>
           <div className="sp-proof-receipt-actions"><button onClick={() => void saveProofSnapshot()} disabled={savingProof}><FileCheck2 size={13} /> {savingProof ? 'Saving…' : 'Save proof'}</button><button onClick={() => void copyProofLabel()}><Copy size={13} /> Copy receipt</button></div>
         </div>}
         <div className="sp-utility-section">
-          <div className="sp-utility-section-head"><strong>Ownership activity</strong><button className="ghost-btn compact" onClick={() => void syncActivity()} disabled={syncingActivity || !address}><RefreshCw size={13} className={syncingActivity ? 'sp-spin' : ''} /> {syncingActivity ? 'Syncing…' : 'Sync mainnet'}</button></div>
-          {events.length ? events.map((event) => <div className="sp-event-row" key={event.id}><span className="sp-event-mark">{event.event_type.slice(0, 1).toUpperCase()}</span><div><strong>{event.event_type}</strong><span>{event.quantity_delta !== null ? `${event.quantity_delta > 0 ? '+' : ''}${event.quantity_delta}` : 'snapshot'} · {event.block_time ? new Date(event.block_time).toLocaleString() : new Date(event.created_at).toLocaleString()}</span></div>{event.transaction_signature && <a href={`https://solscan.io/tx/${event.transaction_signature}`} target="_blank" rel="noreferrer">View</a>}</div>) : <div className="sp-utility-empty"><WalletCards size={16} /><span>No saved provenance events yet. Sync recent confirmed mainnet activity to populate this history.</span></div>}
+          <div className="sp-utility-section-head"><div><strong>Ownership activity</strong><span className="sp-activity-note">Classifications stay conservative; ambiguous balance changes are not called buys or sells.</span></div><button className="ghost-btn compact" onClick={() => void syncActivity()} disabled={syncingActivity || !address}><RefreshCw size={13} className={syncingActivity ? 'sp-spin' : ''} /> {syncingActivity ? 'Syncing…' : 'Sync mainnet'}</button></div>
+          {events.length ? events.map((event) => { const confidence = eventConfidence(event); return <div className="sp-event-row" key={event.id}><span className="sp-event-mark">{eventLabel(event).slice(0, 1).toUpperCase()}</span><div><strong>{eventLabel(event)}</strong><span>{event.quantity_delta !== null ? `${event.quantity_delta > 0 ? '+' : ''}${event.quantity_delta}` : 'snapshot'} · {event.block_time ? new Date(event.block_time).toLocaleString() : new Date(event.created_at).toLocaleString()}</span></div><div className="sp-event-meta">{confidence && <small>{confidence}</small>}{event.transaction_signature && <a href={`https://solscan.io/tx/${event.transaction_signature}`} target="_blank" rel="noreferrer">View</a>}</div></div>; }) : <div className="sp-utility-empty"><WalletCards size={16} /><span>No saved provenance events yet. Sync recent confirmed mainnet activity to populate this history.</span></div>}
         </div>
       </div> : <div className="sp-utility-list">
         {loadingCatalog ? <div className="sp-utility-empty">Loading the verified xStock catalog…</div> : filtered.map((row) => <button className="sp-xstock-row" key={row.symbol} onClick={() => void openAsset(row)}><span className="sp-xstock-logo">{row.logo_url ? <img src={row.logo_url} alt="" /> : row.symbol.replace(/x$/i, '').slice(0, 3)}</span><span className="sp-xstock-copy"><strong>{row.symbol}</strong><small>{row.name}</small></span><ShieldCheck size={13} /><ChevronRight size={13} /></button>)}{!filtered.length && <div className="sp-utility-empty">No verified xStocks match “{query}”.</div>}</div>}
