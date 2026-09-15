@@ -4,8 +4,9 @@ const XSTOCKS_API = 'https://api.xstocks.fi/api/v2/public';
 
 type XStockDeployment = { network?: string; address?: string; chain?: string };
 type XStockAssetResponse = { symbol?: string; name?: string; displayName?: string; deployments?: XStockDeployment[]; networks?: XStockDeployment[]; mintAddress?: string; solanaAddress?: string; address?: string };
-type PriceResponse = { price?: number | string; data?: { price?: number | string }; dataPoints?: Array<{ price?: number | string }> };
+type PriceResponse = { price?: number | string; data?: { price?: number | string }; dataPoints?: Array<{ price?: number | string; timestamp?: number | string }> };
 type MultiplierResponse = { multiplier?: number | string; data?: { multiplier?: number | string }; currentMultiplier?: number | string };
+export type XStockSignal = { symbol: string; price: number | null; previousPrice: number | null; changePercent: number | null };
 
 function pickSolanaMint(asset: XStockAssetResponse): string {
   const deployments = [...(asset.deployments ?? []), ...(asset.networks ?? [])];
@@ -42,6 +43,24 @@ export async function fetchOfficialPrices(stocks: StockAsset[]) {
     }
   }));
   return Object.fromEntries(entries.filter((entry): entry is readonly [string, number] => Boolean(entry)));
+}
+
+export async function fetchOfficialPriceSignals(stocks: StockAsset[]): Promise<Record<string, XStockSignal>> {
+  const entries = await Promise.all(stocks.map(async (stock) => {
+    try {
+      const result = await fetchJson<PriceResponse>(`${XSTOCKS_API}/assets/${encodeURIComponent(stock.symbol)}/price-data?network=Solana`);
+      const points = (result.dataPoints ?? []).map((point) => ({ price: typeof point.price === 'string' ? Number(point.price) : point.price, timestamp: Number(point.timestamp ?? 0) })).filter((point) => typeof point.price === 'number' && Number.isFinite(point.price)).sort((a, b) => a.timestamp - b.timestamp);
+      const raw = result.price ?? result.data?.price ?? points.at(-1)?.price;
+      const latest = typeof raw === 'string' ? Number(raw) : raw;
+      const price = typeof latest === 'number' && Number.isFinite(latest) ? latest : null;
+      const previous = points.length > 1 ? points.at(-2)?.price ?? null : null;
+      const changePercent = price !== null && previous !== null && previous > 0 ? ((price - previous) / previous) * 100 : null;
+      return [stock.symbol, { symbol: stock.symbol, price, previousPrice: previous, changePercent }] as const;
+    } catch {
+      return [stock.symbol, { symbol: stock.symbol, price: null, previousPrice: null, changePercent: null }] as const;
+    }
+  }));
+  return Object.fromEntries(entries);
 }
 
 export async function fetchOfficialMultipliers(stocks: StockAsset[]) {
