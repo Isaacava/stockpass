@@ -25,6 +25,12 @@ type PriceResponse = {
   dataPoints?: Array<{ price?: number | string }>;
 };
 
+type MultiplierResponse = {
+  multiplier?: number | string;
+  data?: { multiplier?: number | string };
+  currentMultiplier?: number | string;
+};
+
 function pickSolanaMint(asset: XStockAssetResponse): string {
   const deployments = [...(asset.deployments ?? []), ...(asset.networks ?? [])];
   const solana = deployments.find((entry) => {
@@ -74,4 +80,21 @@ export async function fetchOfficialPrices(stocks: StockAsset[]) {
   }));
 
   return Object.fromEntries(entries.filter((entry): entry is readonly [string, number] => Boolean(entry)));
+}
+
+export async function fetchOfficialMultipliers(stocks: StockAsset[]) {
+  const entries = await Promise.all(stocks.map(async (stock) => {
+    try {
+      const result = await fetchJson<MultiplierResponse>(
+        `${XSTOCKS_API}/assets/${encodeURIComponent(stock.symbol)}/multiplier?network=Solana`
+      );
+      const raw = result.multiplier ?? result.currentMultiplier ?? result.data?.multiplier;
+      const multiplier = typeof raw === 'string' ? Number(raw) : raw;
+      return [stock.symbol, Number.isFinite(multiplier) && multiplier > 0 ? multiplier : 1] as const;
+    } catch {
+      return [stock.symbol, 1] as const;
+    }
+  }));
+
+  return Object.fromEntries(entries);
 }
