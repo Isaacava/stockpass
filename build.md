@@ -36,8 +36,10 @@ StockPass combines three layers:
 - New **Market utility hub** available from the connected workspace: searchable verified Solana xStock catalog, per-asset live price lookup, official Solana mint, current connected-wallet balance, alert creation, and saved provenance-event history.
 - New **mainnet xStock activity sync**: reads recent confirmed wallet transactions, detects supported xStock balance changes, records increase/decrease events with slots, block times and confirmed transaction signatures, and exposes a manual `Sync mainnet` action in the Market utility.
 - New **mainnet proof receipt**: a positive xStock holding can be saved as a timestamped `stockpass_verification_snapshots` record with the current confirmed slot, and the utility can copy a human-readable proof receipt.
-- New **wallet-signature authentication foundation**: a 5-minute challenge message, Ed25519/NaCl signature verification in a Supabase Edge Function, one-use challenge protection and a 7-day opaque wallet session stored server-side as a SHA-256 token hash.
-- New client auth helper in `src/lib/walletAuth.ts` for requesting/signing/verifying wallet challenges and retaining the resulting session token locally for later authenticated edge calls.
+- New **wallet-signature authentication**: a 5-minute challenge message, Ed25519/NaCl signature verification in a Supabase Edge Function, one-use challenge protection and a 7-day opaque wallet session stored server-side as a SHA-256 token hash.
+- New **connected-wallet auth gate**: the workspace now waits for a real Solana wallet `signMessage` verification before loading profile/workspace data. Signing is explicitly non-transactional.
+- New **Supabase session propagation**: the opaque signed-wallet session is attached to PostgREST requests without replacing Supabase's normal publishable-key Authorization header.
+- New **wallet-scoped RLS**: all StockPass tables now have RLS enabled. Public catalog/profile/feed tables retain public-read policies; wallet-owned records require the active signed wallet session. Wallet auth challenge/session rows remain server-only and have no browser policies.
 - Mobile navigation and responsive layouts.
 - Social timeline visual language inspired by modern consumer feeds: name + @username identity, flat timeline posts, profile tabs, follow actions and compact proof indicators, while retaining original StockPass styling and terminology.
 - Utility-first landing page focused on portfolio, mainnet proof, market context, alerts and future signed actions.
@@ -58,7 +60,7 @@ StockPass-specific tables include:
 - `stockpass_wallet_auth_challenges` for wallet-signature authentication/nonces.
 - `stockpass_wallet_auth_sessions` for hashed opaque authentication sessions.
 - `stockpass_position_events` for mainnet ownership/provenance events and transaction signatures.
-- `stockpass_trade_intents` for quote/sign/submit/confirm state around eventual real wallet-signed trades.
+- `stockpass_trade_intents` for quote/sign/submit/confirm state around eventual real wallet-signed actions.
 - `stockpass_pnl_snapshots` for durable portfolio/PnL snapshots.
 
 These tables are data foundations only; they do not create simulated balances or execute trades by themselves.
@@ -107,7 +109,9 @@ The public profile portfolio and workspace utility view follow this invariant: x
 
 The shared Supabase project contains the StockPass-specific `stockpass_*` tables alongside unrelated AgentMarket tables. Do not delete or rewrite the AgentMarket tables.
 
-The new wallet-auth session table and edge function are now deployed, but the browser workspace has not yet been switched to signature-authenticated writes. **RLS must still remain disabled until wallet identity is wired through the public data paths.** The intended sequence is: finish browser wallet-signature login, add wallet-scoped policies for public/read-only versus wallet-owned data, test all reads/writes, then enable RLS without breaking the public catalog/profile reads.
+**Wallet authentication and RLS are now active.** The browser obtains a short-lived challenge from the `wallet-auth` Edge Function, signs it with the connected Solana wallet, receives a 7-day opaque session token, and keeps only the token client-side. The database stores only its SHA-256 hash. Supabase requests carry the opaque token through the existing `x-client-info` header while retaining the normal publishable-key Authorization header. The RLS resolver hashes that token and maps it to the authenticated wallet before wallet-owned policies are evaluated.
+
+The current database verification shows all 15 StockPass tables have RLS enabled. The public catalog/assets/profile/feed records have read policies where required; wallet-owned profile, alert, follow, notification, activity, Telegram, position, trade-intent and PnL mutations are wallet-scoped. Challenge/session tables have RLS enabled with zero browser policies because only the wallet-auth Edge Function's service-role client should access them.
 
 ## Integration setup still required
 
@@ -123,16 +127,19 @@ PnL requires a Birdeye API key. The current helper uses `VITE_BIRDEYE_API_KEY` f
 
 ## Current next targets
 
-1. Wire `src/lib/walletAuth.ts` into the connected-wallet lifecycle using a real wallet adapter signer, then add wallet-scoped RLS policies.
-2. Make Discover resolve each post author through the saved StockPass display name + @username so feed cards never fall back to wallet text when a profile exists.
-3. Expand the recent Solana activity decoder from generic increase/decrease events into buy/sell/receive/send classifications when transaction instructions allow reliable attribution.
-4. Wire `stockpass_trade_intents` into a wallet-signed mainnet quote/submit/confirm flow; no simulated execution.
-5. Derive durable cost basis and realized/unrealized PnL from transaction/provenance history and persist snapshots server-side.
-6. Detect position reductions/sells and create seller-proof records tied to confirmed signatures.
-7. Deploy and schedule the StockPass alerts worker once required secrets/scheduling are available.
-8. Finish Telegram connection UX and notification settings.
-9. Generate milestone post drafts from verified portfolio events.
-10. Upgrade Discover into a first-class 732-asset xStock discovery experience with following-aware feed tabs, search and direct asset navigation.
-11. Expand the Market utility hub into dedicated asset screens with charts, provenance, holder context and action receipts.
-12. Keep the official xStock catalog synchronized as new Solana assets are issued or retired.
-13. Judge-flow testing from wallet connection → profile setup → market utility → proof → portfolio → trade → PnL → post → follow → notification → public profile.
+1. Make Discover resolve each post author through the saved StockPass display name + @username so feed cards never fall back to wallet text when a profile exists.
+2. Expand the recent Solana activity decoder from generic increase/decrease events into buy/sell/receive/send classifications when transaction instructions allow reliable attribution.
+3. Wire `stockpass_trade_intents` into a real wallet-signed mainnet quote/submit/confirm flow; no simulated execution.
+4. Derive durable cost basis and realized/unrealized PnL from transaction/provenance history and persist snapshots server-side.
+5. Detect position reductions/sells and create seller-proof records tied to confirmed signatures.
+6. Deploy and schedule the StockPass alerts worker once required secrets/scheduling are available.
+7. Finish Telegram connection UX and notification settings.
+8. Generate milestone post drafts from verified portfolio events.
+9. Upgrade Discover into a first-class 732-asset xStock discovery experience with following-aware feed tabs, search and direct asset navigation.
+10. Expand the Market utility hub into dedicated asset screens with charts, provenance, holder context and action receipts.
+11. Keep the official xStock catalog synchronized as new Solana assets are issued or retired.
+12. Judge-flow testing from wallet connection → signature verification → profile setup → market utility → proof → portfolio → action → PnL → post → follow → notification → public profile.
+
+## Build verification
+
+The latest production Vercel deployment triggered by the RLS commit is `dpl_EvaR5je6kGsvvDURcTxXd1SLJwxK` and is currently building. Its current error-only build output contains only npm install-script approval warnings and a Rollup annotation warning; no TypeScript/Vite compilation failure has appeared.
