@@ -32,7 +32,7 @@ export default function ProfileHoldingBadges() {
     }
     let target = title.nextElementSibling;
     if (!(target instanceof HTMLElement) || !target.classList.contains('profile-holding-badges-slot')) {
-      target = document.createElement('div');
+      target = document.createElement('span');
       target.className = 'profile-holding-badges-slot';
       title.insertAdjacentElement('afterend', target);
     }
@@ -102,18 +102,15 @@ export default function ProfileHoldingBadges() {
   if (!slot || !wallet || holdings.length === 0) return null;
 
   return createPortal(
-    <div className="profile-holding-badges" aria-label={`${holdings.length} verified xStocks held`}>
+    <span className="profile-holding-badges" aria-label={`${holdings.length} verified xStocks held`}>
       {visible.map((position) => {
         const logo = logoByMint.get(position.mint);
-        return <span className="profile-holding-badge" key={position.mint} title={`${position.name} · verified mainnet holding`}>
-          <span className="profile-holding-badge-mark">
-            {logo ? <img src={logo} alt="" loading="lazy" /> : <span>{position.icon.slice(0, 3)}</span>}
-          </span>
-          <span>{position.symbol}</span>
+        return <span className="profile-holding-badge" key={position.mint} title={`${position.symbol} · ${position.name} · verified mainnet holding`}>
+          {logo ? <img src={logo} alt={position.symbol} loading="lazy" /> : <span className="profile-holding-badge-fallback">{position.symbol.replace(/x$/i, '').slice(0, 2)}</span>}
         </span>;
       })}
-      {remaining > 0 && <span className="profile-holding-more">+{remaining}</span>}
-    </div>,
+      {remaining > 0 && <span className="profile-holding-more" title={`${remaining} more xStock holdings`}>+{remaining}</span>}
+    </span>,
     slot
   );
 }
