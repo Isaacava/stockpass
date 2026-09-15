@@ -6,7 +6,7 @@ import { Bell, Check, ChevronRight, Copy, FileCheck2, RefreshCw, Search, ShieldC
 import { fetchOfficialPrices, resolveOfficialStocks } from './lib/xstocks';
 import { readStockPositions, type VerifiedPosition } from './lib/solana';
 import { syncRecentXStockActivity } from './lib/solanaActivity';
-import { fetchPortfolioPnl, sumPortfolioPnl, type TokenPnl } from './lib/pnl';
+import { sumXStockValue, fetchXStockPortfolioValue, type XStockPortfolioRow } from './lib/xstockPortfolio';
 import { supabase } from './lib/supabase';
 import './stockpass-utility-hub.css';
 
@@ -57,8 +57,9 @@ export default function StockPassUtilityHub() {
   const [selectedPrice, setSelectedPrice] = useState<number | null>(null);
   const [selectedPosition, setSelectedPosition] = useState<VerifiedPosition | null>(null);
   const [events, setEvents] = useState<PositionEvent[]>([]);
-  const [pnl, setPnl] = useState<TokenPnl[]>([]);
+  const [portfolioRows, setPortfolioRows] = useState<XStockPortfolioRow[]>([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [loadingPortfolio, setLoadingPortfolio] = useState(false);
   const [loadingAsset, setLoadingAsset] = useState(false);
   const [syncingActivity, setSyncingActivity] = useState(false);
   const [savingProof, setSavingProof] = useState(false);
@@ -85,9 +86,25 @@ export default function StockPassUtilityHub() {
   }, [open, catalog.length]);
 
   useEffect(() => {
-    if (!open || !address) return;
-    fetchPortfolioPnl(address).then(setPnl).catch(() => setPnl([]));
-  }, [open, address]);
+    if (!open || !address || !catalog.length) return;
+    let cancelled = false;
+    setLoadingPortfolio(true);
+    const assets = catalog
+      .filter((row) => row.solana_mint)
+      .map((row) => ({
+        symbol: row.symbol,
+        name: row.name,
+        icon: row.symbol.replace(/x$/i, ''),
+        mint: row.solana_mint!,
+        source: 'xStocks' as const
+      }));
+    void readStockPositions(connection, new PublicKey(address), assets)
+      .then((positions) => fetchXStockPortfolioValue(positions, assets))
+      .then((rows) => { if (!cancelled) setPortfolioRows(rows); })
+      .catch(() => { if (!cancelled) setPortfolioRows([]); })
+      .finally(() => { if (!cancelled) setLoadingPortfolio(false); });
+    return () => { cancelled = true; };
+  }, [open, address, catalog, connection]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -125,6 +142,10 @@ export default function StockPassUtilityHub() {
       const synced = await syncRecentXStockActivity(connection, new PublicKey(address), assets);
       setMessage(synced.length ? `Synced ${synced.length} new mainnet xStock events.` : 'No new xStock balance changes found in recent mainnet activity.');
       if (selected?.solana_mint) await loadEvents(address, selected.solana_mint);
+      if (assets.length) {
+        const positions = await readStockPositions(connection, new PublicKey(address), assets);
+        setPortfolioRows(await fetchXStockPortfolioValue(positions, assets));
+      }
     } catch {
       setMessage('Could not sync recent Solana activity.');
     } finally {
@@ -151,7 +172,7 @@ export default function StockPassUtilityHub() {
         }
       }
     } catch {
-      setMessage('The live asset data could not be loaded right now.');
+      setMessage('The live xStock data could not be loaded right now.');
     } finally {
       setLoadingAsset(false);
     }
@@ -159,7 +180,7 @@ export default function StockPassUtilityHub() {
 
   const createAlert = async () => {
     if (!address || !selected?.solana_mint || !selectedPrice) {
-      setMessage('Connect a wallet and wait for a live price before creating an alert.');
+      setMessage('Connect a wallet and wait for a live xStock price before creating an alert.');
       return;
     }
     const { error } = await supabase.from('stockpass_alerts').insert({
@@ -210,7 +231,7 @@ export default function StockPassUtilityHub() {
     }
   };
 
-  const totalPnl = sumPortfolioPnl(pnl);
+  const totalTrackedValue = sumXStockValue(portfolioRows);
 
   return <>
     {open && <div className="sp-utility-backdrop" onClick={() => setOpen(false)} />}
@@ -227,7 +248,7 @@ export default function StockPassUtilityHub() {
 
       <div className="sp-utility-summary">
         <div><span>Verified catalog</span><strong>{catalog.length || '—'}</strong></div>
-        <div><span>Your PnL</span><strong className={totalPnl >= 0 ? 'positive' : 'negative'}>{pnl.length ? `${totalPnl >= 0 ? '+' : ''}$${totalPnl.toFixed(2)}` : '—'}</strong></div>
+        <div><span>Tracked xStock value</span><strong>{loadingPortfolio ? 'Loading…' : portfolioRows.length ? `$${totalTrackedValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</strong></div>
         <div><span>Network</span><strong><span className="sp-live-dot" /> Mainnet</strong></div>
       </div>
 
@@ -250,8 +271,8 @@ export default function StockPassUtilityHub() {
           <div className="sp-proof-receipt-actions"><button onClick={() => void saveProofSnapshot()} disabled={savingProof}><FileCheck2 size={13} /> {savingProof ? 'Saving…' : 'Save proof'}</button><button onClick={() => void copyProofLabel()}><Copy size={13} /> Copy receipt</button></div>
         </div>}
         <div className="sp-utility-section">
-          <div className="sp-utility-section-head"><div><strong>Ownership activity</strong><span className="sp-activity-note">Classifications stay conservative; ambiguous balance changes are not called buys or sells.</span></div><button className="ghost-btn compact" onClick={() => void syncActivity()} disabled={syncingActivity || !address}><RefreshCw size={13} className={syncingActivity ? 'sp-spin' : ''} /> {syncingActivity ? 'Syncing…' : 'Sync mainnet'}</button></div>
-          {events.length ? events.map((event) => { const confidence = eventConfidence(event); return <div className="sp-event-row" key={event.id}><span className="sp-event-mark">{eventLabel(event).slice(0, 1).toUpperCase()}</span><div><strong>{eventLabel(event)}</strong><span>{event.quantity_delta !== null ? `${event.quantity_delta > 0 ? '+' : ''}${event.quantity_delta}` : 'snapshot'} · {event.block_time ? new Date(event.block_time).toLocaleString() : new Date(event.created_at).toLocaleString()}</span></div><div className="sp-event-meta">{confidence && <small>{confidence}</small>}{event.transaction_signature && <a href={`https://solscan.io/tx/${event.transaction_signature}`} target="_blank" rel="noreferrer">View</a>}</div></div>; }) : <div className="sp-utility-empty"><WalletCards size={16} /><span>No saved provenance events yet. Sync recent confirmed mainnet activity to populate this history.</span></div>}
+          <div className="sp-utility-section-head"><div><strong>Ownership activity</strong><span className="sp-activity-note">Only xStock balance changes are tracked. Ambiguous changes are not called buys or sells.</span></div><button className="ghost-btn compact" onClick={() => void syncActivity()} disabled={syncingActivity || !address}><RefreshCw size={13} className={syncingActivity ? 'sp-spin' : ''} /> {syncingActivity ? 'Syncing…' : 'Sync mainnet'}</button></div>
+          {events.length ? events.map((event) => { const confidence = eventConfidence(event); return <div className="sp-event-row" key={event.id}><span className="sp-event-mark">{eventLabel(event).slice(0, 1).toUpperCase()}</span><div><strong>{eventLabel(event)}</strong><span>{event.quantity_delta !== null ? `${event.quantity_delta > 0 ? '+' : ''}${event.quantity_delta}` : 'snapshot'} · {event.block_time ? new Date(event.block_time).toLocaleString() : new Date(event.created_at).toLocaleString()}</span></div><div className="sp-event-meta">{confidence && <small>{confidence}</small>}{event.transaction_signature && <a href={`https://solscan.io/tx/${event.transaction_signature}`} target="_blank" rel="noreferrer">View</a>}</div></div>; }) : <div className="sp-utility-empty"><WalletCards size={16} /><span>No saved xStock provenance events yet. Sync recent confirmed mainnet activity to populate this history.</span></div>}
         </div>
       </div> : <div className="sp-utility-list">
         {loadingCatalog ? <div className="sp-utility-empty">Loading the verified xStock catalog…</div> : filtered.map((row) => <button className="sp-xstock-row" key={row.symbol} onClick={() => void openAsset(row)}><span className="sp-xstock-logo">{row.logo_url ? <img src={row.logo_url} alt="" /> : row.symbol.replace(/x$/i, '').slice(0, 3)}</span><span className="sp-xstock-copy"><strong>{row.symbol}</strong><small>{row.name}</small></span><ShieldCheck size={13} /><ChevronRight size={13} /></button>)}{!filtered.length && <div className="sp-utility-empty">No verified xStocks match “{query}”.</div>}</div>}
