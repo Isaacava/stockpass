@@ -30,12 +30,16 @@ export default function ProfileHoldingBadges() {
       setSlot(null);
       return;
     }
-    let target = title.nextElementSibling;
-    if (!(target instanceof HTMLElement) || !target.classList.contains('profile-holding-badges-slot')) {
+
+    const sibling = title.nextElementSibling;
+    let target: HTMLElement;
+    if (sibling instanceof HTMLElement && sibling.classList.contains('profile-holding-badges-slot')) {
+      target = sibling;
+    } else {
       const created = document.createElement('span');
       created.className = 'profile-holding-badges-slot';
-      const inserted = title.insertAdjacentElement('afterend', created);
-      target = inserted instanceof HTMLElement ? inserted : created;
+      title.insertAdjacentElement('afterend', created);
+      target = created;
     }
     setSlot(target);
   };
