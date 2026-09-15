@@ -4,6 +4,7 @@ import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import { useAppKitAccount } from '@reown/appkit/react';
 import Landing from './Landing';
+import WalletAuthGate from './WalletAuthGate';
 import ProfileSetupGate from './ProfileSetupGate';
 import './styles.css';
 import './mobile-safety.css';
@@ -63,9 +64,11 @@ function Root() {
 
   return (
     <Suspense fallback={<WorkspaceLoading />}>
-      <ProfileSetupGate>
-        <StockPassApp />
-      </ProfileSetupGate>
+      <WalletAuthGate>
+        <ProfileSetupGate>
+          <StockPassApp />
+        </ProfileSetupGate>
+      </WalletAuthGate>
     </Suspense>
   );
 }
