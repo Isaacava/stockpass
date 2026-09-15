@@ -1,17 +1,12 @@
 import { supabase } from './supabase';
+import { clearStoredWalletSession, readWalletSession, writeWalletSession, type WalletSessionRecord } from './walletSession';
 
 type WalletSigner = {
   publicKey?: { toBase58: () => string } | null;
   signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
 };
 
-type WalletAuthResult = {
-  wallet: string;
-  token: string;
-  expiresAt: string;
-};
-
-const STORAGE_KEY = 'stockpass.wallet.session';
+type WalletAuthResult = WalletSessionRecord;
 
 function encodeBase58(bytes: Uint8Array) {
   const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -30,28 +25,12 @@ function encodeBase58(bytes: Uint8Array) {
   return encoded || alphabet[0];
 }
 
-function saveSession(session: WalletAuthResult) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
-}
-
-export function loadWalletSession(): WalletAuthResult | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const session = JSON.parse(raw) as WalletAuthResult;
-    if (!session.token || !session.wallet || Date.parse(session.expiresAt) <= Date.now()) {
-      localStorage.removeItem(STORAGE_KEY);
-      return null;
-    }
-    return session;
-  } catch {
-    localStorage.removeItem(STORAGE_KEY);
-    return null;
-  }
+export function loadWalletSession() {
+  return readWalletSession();
 }
 
 export function clearWalletSession() {
-  localStorage.removeItem(STORAGE_KEY);
+  clearStoredWalletSession();
 }
 
 export async function authenticateWallet(wallet: WalletSigner): Promise<WalletAuthResult> {
@@ -83,7 +62,7 @@ export async function authenticateWallet(wallet: WalletSigner): Promise<WalletAu
   }
 
   const session = data as WalletAuthResult;
-  saveSession(session);
+  writeWalletSession(session);
   return session;
 }
 
@@ -97,5 +76,5 @@ export async function refreshWalletSession(wallet: WalletSigner) {
 
 export function walletAuthHeaders(): HeadersInit {
   const session = loadWalletSession();
-  return session ? { Authorization: `Bearer ${session.token}` } : {};
+  return session ? { 'x-stockpass-session': session.token } : {};
 }
