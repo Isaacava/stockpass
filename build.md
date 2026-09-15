@@ -34,6 +34,7 @@ StockPass combines three layers:
 - Portfolio verification view for the connected wallet.
 - Workspace utility panel showing live supported xStock holdings, estimated live value when prices are available, optional PnL, and Telegram alert connection.
 - New **Market utility hub** available from the connected workspace: searchable verified Solana xStock catalog, per-asset live price lookup, official Solana mint, current connected-wallet balance, alert creation, and saved provenance-event history.
+- New **mainnet xStock activity sync**: reads recent confirmed wallet transactions, detects supported xStock balance changes, records increase/decrease events with slots, block times and confirmed transaction signatures, and exposes a manual `Sync mainnet` action in the Market utility.
 - Mobile navigation and responsive layouts.
 - Social timeline visual language inspired by modern consumer feeds: name + @username identity, flat timeline posts, profile tabs, follow actions and compact proof indicators, while retaining original StockPass styling and terminology.
 - Utility-first landing page focused on portfolio, mainnet proof, market context, alerts and future signed actions.
@@ -102,7 +103,7 @@ The public profile portfolio and workspace utility view follow this invariant: x
 
 The shared Supabase project contains the StockPass-specific `stockpass_*` tables alongside unrelated AgentMarket tables. Do not delete or rewrite the AgentMarket tables.
 
-**Security work is still outstanding:** Supabase's security advisor currently reports that the 10 public StockPass tables have RLS disabled. Do not enable RLS blindly, because the existing browser client is not yet using wallet-signature auth. The intended sequence is to finish wallet-signature authentication, then add wallet-scoped policies, then enable RLS without breaking the public catalog/profile read paths.
+**Security work is still outstanding:** Supabase's security advisor currently reports that the StockPass tables have RLS disabled, including the newer catalog, auth-challenge, activity, trade-intent and PnL tables. Do not enable RLS blindly, because the existing browser client is not yet using wallet-signature auth. The intended sequence is to finish wallet-signature authentication, add wallet-scoped policies for public/read-only versus wallet-owned data, then enable RLS without breaking the public catalog/profile reads.
 
 ## Integration setup still required
 
@@ -119,9 +120,9 @@ PnL requires a Birdeye API key. The current helper uses `VITE_BIRDEYE_API_KEY` f
 ## Current next targets
 
 1. Finish wallet-signature authentication using the new challenge table and then enable wallet-scoped RLS policies.
-2. Populate `stockpass_position_events` from Solana transaction/signature history, not just verification snapshots.
+2. Expand the recent Solana activity decoder from generic increase/decrease events into buy/sell/receive/send classifications when transaction instructions allow reliable attribution.
 3. Wire `stockpass_trade_intents` into a wallet-signed mainnet quote/submit/confirm flow; no simulated execution.
-4. Derive durable cost basis and realized/unrealized PnL from transaction/provenance history.
+4. Derive durable cost basis and realized/unrealized PnL from transaction/provenance history and persist snapshots server-side.
 5. Detect position reductions/sells and create seller-proof records tied to confirmed signatures.
 6. Deploy and schedule the StockPass alerts worker once required secrets/scheduling are available.
 7. Finish Telegram connection UX and notification settings.
