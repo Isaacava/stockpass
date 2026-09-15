@@ -24,7 +24,8 @@ export async function fetchXStockPortfolioValue(
 
   return positions.map((position) => {
     const price = Number.isFinite(prices[position.symbol]) ? prices[position.symbol] : null;
-    const multiplier = Number.isFinite(multipliers[position.symbol]) ? multipliers[position.symbol] : 1;
+    const rawMultiplier = multipliers[position.symbol];
+    const multiplier = typeof rawMultiplier === 'number' && Number.isFinite(rawMultiplier) && rawMultiplier > 0 ? rawMultiplier : 1;
     const holding = position.balance * multiplier;
     return {
       mint: position.mint,
