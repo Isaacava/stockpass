@@ -9,7 +9,7 @@ It is a protection overlay for real Kamino xStock lending positions on Solana. I
 1. Discover the connected wallet's real Kamino obligations.
 2. Filter obligations that use supported xStocks as collateral.
 3. Read Kamino's current collateral, debt and health/liquidation state.
-4. Estimate typical Friday-close → Monday-open gap risk.
+4. Estimate typical Friday-close → Monday/next-session-open gap risk.
 5. Overlay upcoming earnings risk where relevant.
 6. Run the protection check before the weekend.
 7. Alert the user when the current buffer may not cover the modeled gap.
@@ -32,7 +32,7 @@ Current-source verification was performed before implementation began.
 - Kamino's current TypeScript SDK is `@kamino-finance/klend-sdk`. The current package is published as 12.0.0 and documents `KaminoMarket` reads plus `KaminoAction` lending operations. The official repository and package should remain the source of truth for API changes.
 - Kamino's current mainnet Main Market address used by the SDK examples is `7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF`.
 - Pyth Core was upgraded on August 26, 2026. Current Hermes/Benchmarks requests require API-key authentication, and current historical Benchmarks queries are timestamp-based. The API key must stay server-side.
-- Pyth's current documentation distinguishes regular-session US equity feeds on Pyth Core from extended-hours equity feeds that moved to Pyth Pro. Weekend Gap Guard's risk model is designed around the official data source appropriate to the requested market session, rather than assuming every equity feed is 24/7 on Pyth Core.
+- Pyth's current documentation distinguishes regular-session US equity feeds on Pyth Core from extended-hours equity feeds that moved to Pyth Pro. Weekend Gap Guard's risk model is designed around the requested regular-session close/open measurement rather than assuming every equity feed is 24/7 on Pyth Core.
 - Surfpool is the planned local test environment for a fork of real Solana mainnet state so demo positions can be tested without real funds.
 - STOCKLANA is currently live on the Solana hackathon site and is the target hackathon for this build.
 
@@ -117,18 +117,43 @@ The Pyth API key is read only from the server-side `PYTH_API_KEY` secret and is 
 
 The UI now displays the independent Pyth price beside each discovered xStock position and clearly separates it from Kamino's account state.
 
+## Historical weekend-gap milestone
+
+Added:
+
+- `supabase/functions/wgg-weekend-gap/index.ts` — server-side 13-week historical gap engine, capped at 26 weeks per request.
+- `fetchWeekendGapSummaries()` in `src/lib/pyth.ts`.
+- dashboard wiring in `src/WeekendGapGuardWorkspace.tsx`.
+- deployed Supabase Edge Function: `wgg-weekend-gap` version 2.
+
+The historical engine:
+
+1. derives each discovered xStock's underlying symbol from the real Kamino position
+2. resolves the corresponding Pyth Core equity feed server-side
+3. requests a Friday 15:59 America/New_York near-close observation
+4. requests the next available weekday 09:30 America/New_York session observation, with a weekday fallback for market holidays
+5. calculates the Friday-to-next-session return and the downside-only gap `max(0, -return)`
+6. reports median, 75th percentile, 90th percentile and maximum downside statistics
+7. uses the 75th percentile of downside observations as `typicalWeekendGapPct` for the first-pass WGG risk model
+8. returns the exact feed ID, sample count, date window and methodology so the frontend does not present an unexplained number
+
+The Friday timestamp intentionally uses 15:59 rather than exactly 16:00 because the current Pyth v2 timestamp endpoint returns the first update whose publish time is at or after the requested timestamp. This avoids a Friday query accidentally jumping directly to a later session.
+
+The frontend now feeds `current liquidation buffer + typical historical downside gap` into `evaluateWeekendRisk()` and shows the resulting `SAFE`, `WATCH` or `FLAGGED` state alongside each xStock.
+
+No historical risk value is fabricated: when the Pyth API key is not configured or the feed has no usable observations, the UI shows an explicit unavailable state.
+
 ## Next implementation steps
 
-1. Configure the server-side `PYTH_API_KEY` and verify live price responses for the supported xStock underlyings.
-2. Add the historical Friday-close/Monday-open calculation as a backend job rather than a frontend request path.
-3. Add a verified earnings-calendar adapter behind the server side.
-4. Combine current liquidation buffer + historical gap + earnings overlay into the final `safe` / `watch` / `flagged` assessment.
-5. Populate `wgg_monitored_positions` from trusted backend checks rather than browser-submitted balances.
-6. Build the Friday monitoring worker and `wgg_alerts` records.
-7. Reuse the existing Telegram connection pattern for opt-in notifications.
-8. Build exact Kamino repay/deposit transaction construction and user-signature flow.
-9. Add Surfpool fixtures/cheatcodes for deterministic flagged-position demos.
-10. Run an end-to-end test before using real mainnet funds.
+1. Configure the server-side `PYTH_API_KEY` and verify live price + historical weekend-gap responses for the supported xStock underlyings.
+2. Add a verified earnings-calendar adapter behind the server side.
+3. Combine the historical gap with upcoming earnings risk in the final assessment.
+4. Populate `wgg_monitored_positions` from trusted backend checks rather than browser-submitted balances.
+5. Build the Friday monitoring worker and `wgg_alerts` records.
+6. Reuse the existing Telegram connection pattern for opt-in notifications.
+7. Build exact Kamino repay/deposit transaction construction and user-signature flow.
+8. Add Surfpool fixtures/cheatcodes for deterministic flagged-position demos.
+9. Run an end-to-end test before using real mainnet funds.
 
 ## Testing policy
 
