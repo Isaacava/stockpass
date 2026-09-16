@@ -33,6 +33,7 @@ export type KaminoXStockCollateral = {
   mint: string;
   reserve: string;
   amount: number;
+  mintDecimals: number;
   liquidationLtvPct: number | null;
 };
 
@@ -40,6 +41,7 @@ export type KaminoDebtPosition = {
   mint: string;
   reserve: string;
   amount: number;
+  mintDecimals: number;
 };
 
 export type KaminoXStockPosition = {
@@ -122,7 +124,8 @@ export async function discoverKaminoXStockPositions(wallet: string, rpcUrl: stri
       const mint = stringifyAddress(reserve.getLiquidityMint());
       const symbol = xStockByMint.get(mint);
       if (!symbol) continue;
-      xStocks.push({ symbol, mint, reserve: reserveAddress, amount: positionAmount(deposit), liquidationLtvPct: reserveLiquidationLtvPct(reserve) });
+      const mintDecimals = decimalNumber(reserve.getMintDecimals()) ?? 0;
+      xStocks.push({ symbol, mint, reserve: reserveAddress, amount: positionAmount(deposit), mintDecimals, liquidationLtvPct: reserveLiquidationLtvPct(reserve) });
     }
 
     if (!xStocks.length) continue;
@@ -136,6 +139,7 @@ export async function discoverKaminoXStockPositions(wallet: string, rpcUrl: stri
         mint: stringifyAddress(reserve.getLiquidityMint()),
         reserve: reserveAddress,
         amount: positionAmount(borrow),
+        mintDecimals: decimalNumber(reserve.getMintDecimals()) ?? 0,
       });
     }
 
