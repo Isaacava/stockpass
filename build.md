@@ -92,6 +92,7 @@ Added `src/lib/kamino.ts` which:
 - resolves the supported Solana xStock catalog through the existing official xStocks API adapter
 - filters the wallet's Kamino obligations to those containing an official xStock reserve
 - returns the real obligation address, xStock mint/symbol, collateral amount, debt reserves, account LTV and SDK-provided deposit/borrow values
+- exposes xStock mint decimals so a later action builder can convert a USD collateral estimate into exact base units
 - extracts the applicable xStock reserve liquidation threshold and exposes a conservative liquidation buffer signal as `liquidation LTV - current account LTV`
 
 The dashboard now has a real **Scan my Kamino positions** action. It performs a read-only mainnet scan and displays only positions actually returned by Kamino. No test balance is injected when the wallet has no matching position.
@@ -150,20 +151,24 @@ No historical risk value is fabricated: when the Pyth API key is not configured 
 
 ## Protection action-planning milestone
 
-The risk module now exposes a first-pass protection planner. For a flagged obligation, the planner can derive:
+The risk module contains a first-pass protection planner for target LTV and can calculate both estimated repayment and estimated additional collateral value.
 
-- the worst adjusted weekend-gap signal among the obligation's xStock collateral
-- a target LTV using the model's existing 120%-of-gap watch boundary below liquidation LTV
-- an estimated debt repayment amount needed to reach that target
-- an estimated additional collateral value needed to reach that target
+The frontend now takes the next step when a position is actually `FLAGGED`:
 
-The planner is intentionally non-executing. A final Kamino transaction must be constructed against fresh on-chain reserve/obligation data immediately before signing because debt accrual, token decimals, balances, current liquidation parameters and other state can change after the monitoring scan.
+- derives a protection target LTV from the live liquidation LTV and adjusted weekend-gap signal
+- estimates the additional collateral value required to reach that target
+- converts that collateral USD estimate into xStock base units using the real reserve mint decimals and the independent Pyth price
+- reloads the current Kamino market and selected obligation
+- builds a real `KaminoAction.buildDepositTxns()` action with the current Kamino SDK
+- exposes the resulting instruction counts as a prepared action
+
+This stage is still **prepare-only**: it does not sign, submit, or move funds. The SDK action is built against fresh on-chain state immediately before preparation. The current Kamino SDK documents `buildDepositTxns()` and `buildRepayTxns()` as the supported lending-action builders, and the action object can be converted into its instruction set with `KaminoAction.actionToIxs()`. citeturn524472search0turn797file0turn807file0
 
 ## Next implementation steps
 
 1. Configure the server-side `PYTH_API_KEY` and verify live price + historical weekend-gap responses for the supported xStock underlyings.
-2. Wire the protection-plan estimates into the dashboard presentation for flagged obligations.
-3. Build exact Kamino repay/deposit transaction construction using the current `klend-sdk` action builders and wallet-signature flow.
+2. Complete wallet-signature integration for prepared Kamino actions without giving the app any standing authorization.
+3. Add repay preparation alongside the current deposit preparation, including exact debt-reserve price/decimal handling from fresh Kamino state.
 4. Add a verified earnings-calendar adapter behind the server side.
 5. Populate `wgg_monitored_positions` from trusted backend checks rather than browser-submitted balances.
 6. Build the Friday monitoring worker and `wgg_alerts` records.
