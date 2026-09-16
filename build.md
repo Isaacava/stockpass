@@ -42,7 +42,12 @@ Current-source verification was performed before implementation began.
 
 Added `src/lib/wggRisk.ts` with a pure, backend-input-driven first-pass risk model. It accepts a current buffer, typical weekend gap and optional earnings adjustment and returns `safe`, `watch` or `flagged`.
 
-This module does not fetch market data and does not invent positions. It is intentionally isolated so the mathematical rule can be tested independently from Kamino/Pyth integrations.
+The module now also contains two algebraic action-planning helpers:
+
+- `calculateRepayUsdForTargetLtv()` estimates debt repayment required to reach a target LTV while holding collateral value constant.
+- `calculateCollateralUsdForTargetLtv()` estimates additional collateral value required to reach a target LTV while holding debt constant.
+
+These are planning estimates only. They do not construct or send a transaction, and final action construction must re-read current Kamino state immediately before a wallet signature.
 
 ### Supabase
 
@@ -95,7 +100,7 @@ The UI also exposes the latest scan time, errors, refresh action, obligation ide
 
 ### Liquidation-buffer scope note
 
-The current buffer is deliberately conservative: the lowest liquidation threshold among the xStock collateral reserves is compared with Kamino's account LTV. It is a risk signal for Weekend Gap Guard and is not presented as a replacement for Kamino's own liquidation engine. The final risk model will combine this live buffer with the independently modeled weekend gap.
+The current buffer is deliberately conservative: the lowest liquidation threshold among the xStock collateral reserves is compared with Kamino's account LTV. It is a risk signal for Weekend Gap Guard and is not presented as a replacement for Kamino's own liquidation engine. The final risk model combines this live buffer with the independently modeled weekend gap.
 
 ## Pyth live-price milestone
 
@@ -143,15 +148,26 @@ The frontend now feeds `current liquidation buffer + typical historical downside
 
 No historical risk value is fabricated: when the Pyth API key is not configured or the feed has no usable observations, the UI shows an explicit unavailable state.
 
+## Protection action-planning milestone
+
+The risk module now exposes a first-pass protection planner. For a flagged obligation, the planner can derive:
+
+- the worst adjusted weekend-gap signal among the obligation's xStock collateral
+- a target LTV using the model's existing 120%-of-gap watch boundary below liquidation LTV
+- an estimated debt repayment amount needed to reach that target
+- an estimated additional collateral value needed to reach that target
+
+The planner is intentionally non-executing. A final Kamino transaction must be constructed against fresh on-chain reserve/obligation data immediately before signing because debt accrual, token decimals, balances, current liquidation parameters and other state can change after the monitoring scan.
+
 ## Next implementation steps
 
 1. Configure the server-side `PYTH_API_KEY` and verify live price + historical weekend-gap responses for the supported xStock underlyings.
-2. Add a verified earnings-calendar adapter behind the server side.
-3. Combine the historical gap with upcoming earnings risk in the final assessment.
-4. Populate `wgg_monitored_positions` from trusted backend checks rather than browser-submitted balances.
-5. Build the Friday monitoring worker and `wgg_alerts` records.
-6. Reuse the existing Telegram connection pattern for opt-in notifications.
-7. Build exact Kamino repay/deposit transaction construction and user-signature flow.
+2. Wire the protection-plan estimates into the dashboard presentation for flagged obligations.
+3. Build exact Kamino repay/deposit transaction construction using the current `klend-sdk` action builders and wallet-signature flow.
+4. Add a verified earnings-calendar adapter behind the server side.
+5. Populate `wgg_monitored_positions` from trusted backend checks rather than browser-submitted balances.
+6. Build the Friday monitoring worker and `wgg_alerts` records.
+7. Reuse the existing Telegram connection pattern for opt-in notifications.
 8. Add Surfpool fixtures/cheatcodes for deterministic flagged-position demos.
 9. Run an end-to-end test before using real mainnet funds.
 
