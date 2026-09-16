@@ -113,13 +113,7 @@ export default function WeekendGapGuardWorkspace() {
       if (fnError) throw fnError;
       const payload = data as { instructions?: PreparedInstruction[]; lookupTables?: string[] } | null;
       if (!payload?.instructions?.length) throw new Error('Protection service returned no instructions.');
-      setPrepared({
-        symbol: row.symbol,
-        amountBaseUnits,
-        instructionCount: payload.instructions.length,
-        instructions: payload.instructions,
-        lookupTables: payload.lookupTables ?? [],
-      });
+      setPrepared({ symbol: row.symbol, amountBaseUnits, instructionCount: payload.instructions.length, instructions: payload.instructions, lookupTables: payload.lookupTables ?? [] });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Protection preparation is not available yet.');
     } finally { setPreparing(false); }
@@ -133,7 +127,7 @@ export default function WeekendGapGuardWorkspace() {
       const latest = await connection.getLatestBlockhash('confirmed');
       const instructions = prepared.instructions.map((ix) => new TransactionInstruction({
         programId: new PublicKey(ix.programAddress),
-        data: Buffer.from(decodeBase64(ix.data)),
+        data: decodeBase64(ix.data),
         keys: ix.accounts.map((account) => ({
           pubkey: new PublicKey(account.address),
           isSigner: account.signer,
@@ -148,11 +142,7 @@ export default function WeekendGapGuardWorkspace() {
         lookupTables.push(result.value);
       }
 
-      const message = new TransactionMessage({
-        payerKey: new PublicKey(address),
-        recentBlockhash: latest.blockhash,
-        instructions,
-      }).compileToV0Message(lookupTables);
+      const message = new TransactionMessage({ payerKey: new PublicKey(address), recentBlockhash: latest.blockhash, instructions }).compileToV0Message(lookupTables);
       const transaction = new VersionedTransaction(message);
       const signed = await walletProvider.signTransaction(transaction as never);
       const txSignature = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 2 });
