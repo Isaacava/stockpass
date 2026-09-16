@@ -9,7 +9,6 @@ import './weekend-gap-guard.css';
 
 const EMPTY_POSITIONS: KaminoXStockPosition[] = [];
 const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
-
 type PreparedState = { obligation: string; symbol: string; kind: 'deposit'; amountBaseUnits: string; instructionCount: number } | null;
 
 export default function WeekendGapGuardWorkspace() {
@@ -32,8 +31,9 @@ export default function WeekendGapGuardWorkspace() {
     positions: positions.flatMap((position) => position.xStocks.map((stock) => {
       const symbol = stock.symbol.replace(/x$/i, '');
       const gap = weekendGaps[symbol];
-      const risk = position.liquidationBufferPct !== null && gap?.typicalWeekendGapPct != null
-        ? evaluateWeekendRisk({ currentBufferPct: position.liquidationBufferPct, typicalWeekendGapPct: gap.typicalWeekendGapPct })
+      const gapPct = gap?.typicalWeekendGapPct;
+      const risk = position.liquidationBufferPct !== null && gapPct != null
+        ? evaluateWeekendRisk({ currentBufferPct: position.liquidationBufferPct, typicalWeekendGapPct: gapPct })
         : null;
       return { ...stock, symbol, obligation: position.obligation, ltvPct: position.ltvPct, liquidationLtvPct: position.liquidationLtvPct, liquidationBufferPct: position.liquidationBufferPct, pyth: pythPrices[symbol], gap, risk };
     })),
@@ -71,13 +71,19 @@ export default function WeekendGapGuardWorkspace() {
   const prepareProtection = async (position: KaminoXStockPosition, stockSymbol: string) => {
     if (!address) return;
     const item = summary.positions.find((row) => row.obligation === position.obligation && row.symbol === stockSymbol);
-    if (!item?.gap || item.liquidationLtvPct === null || item.pyth?.price == null) return;
-    const risk = evaluateWeekendRisk({ currentBufferPct: item.liquidationBufferPct ?? 0, typicalWeekendGapPct: item.gap.typicalWeekendGapPct ?? 0 });
+    if (!item) return;
+    const gap = item.gap;
+    const price = item.pyth?.price;
+    const liquidationLtv = item.liquidationLtvPct;
+    const currentBuffer = item.liquidationBufferPct;
+    const typicalGap = gap?.typicalWeekendGapPct;
+    if (!gap || price == null || liquidationLtv == null || currentBuffer == null || typicalGap == null) return;
+    const risk = evaluateWeekendRisk({ currentBufferPct: currentBuffer, typicalWeekendGapPct: typicalGap });
     if (risk.status !== 'flagged') return;
-    const targetLtvPct = Math.max(1, item.liquidationLtvPct - risk.adjustedGapPct * 1.2);
+    const targetLtvPct = Math.max(1, liquidationLtv - risk.adjustedGapPct * 1.2);
     const neededCollateralUsd = calculateCollateralUsdForTargetLtv(position.borrowValueUsd ?? 0, position.depositValueUsd ?? 0, targetLtvPct);
     if (neededCollateralUsd <= 0) return;
-    const tokenAmount = neededCollateralUsd / item.pyth.price;
+    const tokenAmount = neededCollateralUsd / price;
     const baseUnits = BigInt(Math.ceil(tokenAmount * 10 ** item.mintDecimals)).toString();
     setPreparingProtection(true); setProtectionError(''); setPrepared(null);
     try {
@@ -101,7 +107,7 @@ export default function WeekendGapGuardWorkspace() {
         {prepared && <div className="wgg-empty"><ShieldCheck size={21} /><strong>Kamino protection action prepared</strong><span>{prepared.symbol} deposit action · {prepared.instructionCount} instructions prepared from fresh on-chain state. Nothing was signed or sent.</span></div>}
         {!loadingPositions && !loadError && positions.length === 0 && <div className="wgg-empty"><AlertTriangle size={21} /><strong>No xStock-backed Kamino obligation found</strong><span>The scan completed against mainnet. We did not fabricate a position.</span></div>}
         {loadingPositions && <div className="wgg-empty"><LoaderCircle size={21} className="wgg-spin" /><strong>Reading Kamino, Pyth and weekend history</strong><span>Loading current obligations, independent prices and historical observations. This is read-only.</span></div>}
-        {!loadingPositions && positions.length > 0 && <div className="wgg-position-list">{positions.map((position) => <article className="wgg-position-card" key={position.obligation}><div className="wgg-position-head"><div><span className="wgg-position-label">OBLIGATION</span><strong>{position.obligation.slice(0, 6)}…{position.obligation.slice(-6)}</strong></div><span className="wgg-ltv">LTV {position.ltvPct !== null ? `${position.ltvPct.toFixed(2)}%` : '—'}</span></div><div className="wgg-xstock-list">{position.xStocks.map((stock) => { const symbol = stock.symbol.replace(/x$/i, ''); const pyth = pythPrices[symbol]; const gap = weekendGaps[symbol]; const risk = position.liquidationBufferPct !== null && gap?.typicalWeekendGapPct != null ? evaluateWeekendRisk({ currentBufferPct: position.liquidationBufferPct, typicalWeekendGapPct: gap.typicalWeekendGapPct }) : null; return <div className="wgg-xstock-row" key={`${position.obligation}-${stock.mint}`}><span className="wgg-xstock-icon">{symbol.slice(0, 4)}</span><div><strong>{stock.symbol}</strong><span>{stock.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} collateral units</span></div><div className="wgg-xstock-status"><span>{pyth ? `$${pyth.price.toFixed(2)} Pyth` : 'Pyth pending'}</span>{risk && <strong>{risk.status.toUpperCase()}</strong>}</div>{risk?.status === 'flagged' && <button className="wgg-secondary" onClick={() => void prepareProtection(position, symbol)} disabled={preparingProtection}>{preparingProtection ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} Prepare fix</button>}</div>; })}</div><div className="wgg-position-metrics"><div><span>Liquidation LTV</span><strong>{position.liquidationLtvPct !== null ? `${position.liquidationLtvPct.toFixed(2)}%` : '—'}</strong></div><div><span>Current buffer</span><strong>{position.liquidationBufferPct !== null ? `${position.liquidationBufferPct.toFixed(2)} pts` : '—'}</strong></div><div><span>Typical weekend gap</span><strong>{position.xStocks[0] && weekendGaps[position.xStocks[0].symbol.replace(/x$/i, '')]?.typicalWeekendGapPct != null ? `${weekendGaps[position.xStocks[0].symbol.replace(/x$/i, '')]!.typicalWeekendGapPct.toFixed(2)}%` : '—'}</strong></div><div><span>Borrow value</span><strong>{position.borrowValueUsd !== null ? `$${position.borrowValueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</strong></div></div></article>)}</div>}
+        {!loadingPositions && positions.length > 0 && <div className="wgg-position-list">{positions.map((position) => { const firstSymbol = position.xStocks[0]?.symbol.replace(/x$/i, ''); const firstGap = firstSymbol ? weekendGaps[firstSymbol] : undefined; return <article className="wgg-position-card" key={position.obligation}><div className="wgg-position-head"><div><span className="wgg-position-label">OBLIGATION</span><strong>{position.obligation.slice(0, 6)}…{position.obligation.slice(-6)}</strong></div><span className="wgg-ltv">LTV {position.ltvPct !== null ? `${position.ltvPct.toFixed(2)}%` : '—'}</span></div><div className="wgg-xstock-list">{position.xStocks.map((stock) => { const symbol = stock.symbol.replace(/x$/i, ''); const pyth = pythPrices[symbol]; const gap = weekendGaps[symbol]; const typicalGap = gap?.typicalWeekendGapPct; const currentBuffer = position.liquidationBufferPct; const risk = currentBuffer !== null && typicalGap != null ? evaluateWeekendRisk({ currentBufferPct: currentBuffer, typicalWeekendGapPct: typicalGap }) : null; return <div className="wgg-xstock-row" key={`${position.obligation}-${stock.mint}`}><span className="wgg-xstock-icon">{symbol.slice(0, 4)}</span><div><strong>{stock.symbol}</strong><span>{stock.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} collateral units</span></div><div className="wgg-xstock-status"><span>{pyth ? `$${pyth.price.toFixed(2)} Pyth` : 'Pyth pending'}</span>{risk && <strong>{risk.status.toUpperCase()}</strong>}</div>{risk?.status === 'flagged' && <button className="wgg-secondary" onClick={() => void prepareProtection(position, symbol)} disabled={preparingProtection}>{preparingProtection ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} Prepare fix</button>}</div>; })}</div><div className="wgg-position-metrics"><div><span>Liquidation LTV</span><strong>{position.liquidationLtvPct !== null ? `${position.liquidationLtvPct.toFixed(2)}%` : '—'}</strong></div><div><span>Current buffer</span><strong>{position.liquidationBufferPct !== null ? `${position.liquidationBufferPct.toFixed(2)} pts` : '—'}</strong></div><div><span>Typical weekend gap</span><strong>{firstGap?.typicalWeekendGapPct != null ? `${firstGap.typicalWeekendGapPct.toFixed(2)}%` : '—'}</strong></div><div><span>Borrow value</span><strong>{position.borrowValueUsd !== null ? `$${position.borrowValueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</strong></div></div></article>; })}</div>}
       </section>}
       <section className="wgg-explain"><div><div className="wgg-eyebrow">HOW IT WORKS</div><h2>Not a lending protocol.<br />A protection layer.</h2></div><div className="wgg-steps"><article><b>01</b><strong>Discover</strong><span>Read the wallet's real Kamino obligations.</span></article><article><b>02</b><strong>Assess</strong><span>Measure the live liquidation buffer against historical weekend-gap observations.</span></article><article><b>03</b><strong>Protect</strong><span>Prepare the exact Kamino fix for the wallet to review and sign.</span></article></div></section>
       <footer className="wgg-footer"><span>Weekend Gap Guard</span><span>Solana mainnet · Kamino overlay · no custody</span><span><CircleHelp size={12} /> No demo balance is ever presented as real.</span></footer>
