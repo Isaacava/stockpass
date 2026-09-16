@@ -84,9 +84,7 @@ export default function WeekendGapGuardWorkspace() {
         const [prices, gaps] = await Promise.allSettled([fetchPythPrices(symbols), fetchWeekendGapSummaries(symbols, 13)]);
         setPythPrices(prices.status === 'fulfilled' ? prices.value : {});
         setWeekendGaps(gaps.status === 'fulfilled' ? gaps.value : {});
-        if (prices.status === 'rejected' && gaps.status === 'rejected') {
-          setError('Kamino loaded, but the Pyth pricing and weekend-gap services are unavailable.');
-        }
+        if (prices.status === 'rejected' && gaps.status === 'rejected') setError('Kamino loaded, but the Pyth pricing and weekend-gap services are unavailable.');
       }
       setLastLoaded(new Date());
     } catch (e) {
@@ -126,25 +124,18 @@ export default function WeekendGapGuardWorkspace() {
       const connection = new Connection(endpoint, 'confirmed');
       const latest = await connection.getLatestBlockhash('confirmed');
       const instructions = prepared.instructions.map((ix) => new TransactionInstruction({
-        programId: new PublicKey(ix.programAddress),
-        data: decodeBase64(ix.data),
-        keys: ix.accounts.map((account) => ({
-          pubkey: new PublicKey(account.address),
-          isSigner: account.signer,
-          isWritable: account.writable,
-        })),
+        programId: new PublicKey(ix.programAddress), data: decodeBase64(ix.data),
+        keys: ix.accounts.map((account) => ({ pubkey: new PublicKey(account.address), isSigner: account.signer, isWritable: account.writable })),
       }));
-
       const lookupTables = [];
       for (const lookupTableAddress of prepared.lookupTables) {
         const result = await connection.getAddressLookupTable(new PublicKey(lookupTableAddress));
         if (!result.value) throw new Error(`Kamino lookup table ${lookupTableAddress} is unavailable on mainnet.`);
         lookupTables.push(result.value);
       }
-
       const message = new TransactionMessage({ payerKey: new PublicKey(address), recentBlockhash: latest.blockhash, instructions }).compileToV0Message(lookupTables);
       const transaction = new VersionedTransaction(message);
-      const signed = await walletProvider.signTransaction(transaction as never);
+      const signed = await walletProvider.signTransaction(transaction as never) as unknown as VersionedTransaction;
       const txSignature = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 2 });
       await connection.confirmTransaction({ signature: txSignature, ...latest }, 'confirmed');
       setSignature(txSignature);
