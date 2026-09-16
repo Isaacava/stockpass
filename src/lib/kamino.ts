@@ -1,5 +1,5 @@
 import { address, createSolanaRpc } from '@solana/kit';
-import { KaminoMarket, getCurrentLedgerInstant } from '@kamino-finance/klend-sdk';
+import { KaminoMarket, getCurrentLedgerInstant, getMedianSlotDurationInMsFromLastEpochs } from '@kamino-finance/klend-sdk';
 import { STOCKS } from './assets';
 import { resolveOfficialStocks } from './xstocks';
 
@@ -80,7 +80,10 @@ export async function discoverKaminoXStockPositions(wallet: string, rpcUrl: stri
   );
 
   const rpc = createSolanaRpc(rpcUrl);
-  const market = await KaminoMarket.load(rpc as never, address(KAMINO_MAIN_MARKET));
+  const recentSlotDurationMs = await getMedianSlotDurationInMsFromLastEpochs();
+  const market = await KaminoMarket.load(rpc as never, address(KAMINO_MAIN_MARKET), recentSlotDurationMs);
+  if (!market) throw new Error('Kamino Main Market could not be loaded.');
+
   const ledgerInstant = await getCurrentLedgerInstant(rpc as never, 'confirmed');
   const rawObligations = await market.getAllUserObligations(address(wallet), ledgerInstant, 'confirmed');
   const obligations = rawObligations as unknown as GenericObligation[];
