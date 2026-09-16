@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, Bell, CircleHelp, Gauge, LoaderCircle, RefreshCw, ShieldCheck, Wallet } from 'lucide-react';
-import { useAppKit, useAppKitAccount } from '@reown/appkit/react';
+import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
+import type { Provider } from '@reown/appkit-adapter-solana';
+import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { discoverKaminoXStockPositions, type KaminoXStockPosition } from './lib/kamino';
 import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
 import { fetchPythPrices, fetchWeekendGapSummaries, type PythPriceMap, type WeekendGapMap } from './lib/pyth';
@@ -9,18 +11,46 @@ import './weekend-gap-guard.css';
 
 const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
-type Row = { position: KaminoXStockPosition; stock: KaminoXStockPosition['xStocks'][number]; symbol: string; gap?: WeekendGapMap[string]; risk: ReturnType<typeof evaluateWeekendRisk> | null; price?: PythPriceMap[string] };
-type Prepared = { symbol: string; amountBaseUnits: string; instructionCount: number } | null;
+type PreparedInstruction = {
+  programAddress: string;
+  data: string;
+  accounts: Array<{ address: string; signer: boolean; writable: boolean }>;
+};
+type Prepared = {
+  symbol: string;
+  amountBaseUnits: string;
+  instructionCount: number;
+  instructions: PreparedInstruction[];
+  lookupTables: string[];
+} | null;
+type Row = {
+  position: KaminoXStockPosition;
+  stock: KaminoXStockPosition['xStocks'][number];
+  symbol: string;
+  gap?: WeekendGapMap[string];
+  risk: ReturnType<typeof evaluateWeekendRisk> | null;
+  price?: PythPriceMap[string];
+};
+
+function decodeBase64(value: string): Uint8Array {
+  const binary = atob(value || '');
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
 
 export default function WeekendGapGuardWorkspace() {
   const { open } = useAppKit();
+  const { walletProvider } = useAppKitProvider<Provider>('solana');
   const { address, isConnected } = useAppKitAccount();
   const [positions, setPositions] = useState<KaminoXStockPosition[]>([]);
   const [pythPrices, setPythPrices] = useState<PythPriceMap>({});
   const [weekendGaps, setWeekendGaps] = useState<WeekendGapMap>({});
   const [loading, setLoading] = useState(false);
   const [preparing, setPreparing] = useState(false);
+  const [signing, setSigning] = useState(false);
   const [prepared, setPrepared] = useState<Prepared>(null);
+  const [signature, setSignature] = useState('');
   const [error, setError] = useState('');
   const [lastLoaded, setLastLoaded] = useState<Date | null>(null);
 
@@ -42,7 +72,7 @@ export default function WeekendGapGuardWorkspace() {
 
   async function scan() {
     if (!address) return;
-    setLoading(true); setError(''); setPrepared(null);
+    setLoading(true); setError(''); setPrepared(null); setSignature('');
     try {
       const discovered = await discoverKaminoXStockPositions(address, endpoint);
       setPositions(discovered);
@@ -54,6 +84,9 @@ export default function WeekendGapGuardWorkspace() {
         const [prices, gaps] = await Promise.allSettled([fetchPythPrices(symbols), fetchWeekendGapSummaries(symbols, 13)]);
         setPythPrices(prices.status === 'fulfilled' ? prices.value : {});
         setWeekendGaps(gaps.status === 'fulfilled' ? gaps.value : {});
+        if (prices.status === 'rejected' && gaps.status === 'rejected') {
+          setError('Kamino loaded, but the Pyth pricing and weekend-gap services are unavailable.');
+        }
       }
       setLastLoaded(new Date());
     } catch (e) {
@@ -72,15 +105,62 @@ export default function WeekendGapGuardWorkspace() {
     const tokenAmount = neededUsd / row.price.price;
     const amountBaseUnits = BigInt(Math.ceil(tokenAmount * 10 ** row.stock.mintDecimals)).toString();
     if (amountBaseUnits === '0') return;
-    setPreparing(true); setError(''); setPrepared(null);
+    setPreparing(true); setError(''); setPrepared(null); setSignature('');
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('wgg-protection-prepare', { body: { wallet: address, obligationAddress: row.position.obligation, reserveAddress: row.stock.reserve, amountBaseUnits, kind: 'deposit', rpcUrl: endpoint } });
+      const { data, error: fnError } = await supabase.functions.invoke('wgg-protection-prepare', {
+        body: { wallet: address, obligationAddress: row.position.obligation, reserveAddress: row.stock.reserve, amountBaseUnits, kind: 'deposit', rpcUrl: endpoint },
+      });
       if (fnError) throw fnError;
-      const payload = data as { instructions?: unknown[] } | null;
-      setPrepared({ symbol: row.symbol, amountBaseUnits, instructionCount: payload?.instructions?.length ?? 0 });
+      const payload = data as { instructions?: PreparedInstruction[]; lookupTables?: string[] } | null;
+      if (!payload?.instructions?.length) throw new Error('Protection service returned no instructions.');
+      setPrepared({
+        symbol: row.symbol,
+        amountBaseUnits,
+        instructionCount: payload.instructions.length,
+        instructions: payload.instructions,
+        lookupTables: payload.lookupTables ?? [],
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Protection preparation is not available yet.');
     } finally { setPreparing(false); }
+  }
+
+  async function signAndSendPrepared() {
+    if (!address || !prepared || !walletProvider) return;
+    setSigning(true); setError(''); setSignature('');
+    try {
+      const connection = new Connection(endpoint, 'confirmed');
+      const latest = await connection.getLatestBlockhash('confirmed');
+      const instructions = prepared.instructions.map((ix) => new TransactionInstruction({
+        programId: new PublicKey(ix.programAddress),
+        data: Buffer.from(decodeBase64(ix.data)),
+        keys: ix.accounts.map((account) => ({
+          pubkey: new PublicKey(account.address),
+          isSigner: account.signer,
+          isWritable: account.writable,
+        })),
+      }));
+
+      const lookupTables = [];
+      for (const lookupTableAddress of prepared.lookupTables) {
+        const result = await connection.getAddressLookupTable(new PublicKey(lookupTableAddress));
+        if (!result.value) throw new Error(`Kamino lookup table ${lookupTableAddress} is unavailable on mainnet.`);
+        lookupTables.push(result.value);
+      }
+
+      const message = new TransactionMessage({
+        payerKey: new PublicKey(address),
+        recentBlockhash: latest.blockhash,
+        instructions,
+      }).compileToV0Message(lookupTables);
+      const transaction = new VersionedTransaction(message);
+      const signed = await walletProvider.signTransaction(transaction as never);
+      const txSignature = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 2 });
+      await connection.confirmTransaction({ signature: txSignature, ...latest }, 'confirmed');
+      setSignature(txSignature);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Wallet signing or transaction submission failed.');
+    } finally { setSigning(false); }
   }
 
   return <div className="wgg-app">
@@ -97,7 +177,7 @@ export default function WeekendGapGuardWorkspace() {
       {isConnected && <section className="wgg-dashboard">
         <div className="wgg-section-head"><div><div className="wgg-eyebrow">REAL KAMINO + PYTH DATA</div><h2>Your xStock-backed obligations.</h2><p>{lastLoaded ? `Mainnet scan completed ${lastLoaded.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.` : 'Scan the current Kamino Main Market to load real positions.'}</p></div><button className="wgg-secondary" onClick={() => void scan()} disabled={loading}><RefreshCw size={14} /> Refresh</button></div>
         {error && <div className="wgg-error"><AlertTriangle size={18} /><div><strong>Action unavailable</strong><span>{error}</span></div></div>}
-        {prepared && <div className="wgg-empty"><ShieldCheck size={21} /><strong>Protection action prepared</strong><span>{prepared.symbol} deposit · {prepared.amountBaseUnits} base units · {prepared.instructionCount} instructions. Nothing has been signed or sent.</span></div>}
+        {prepared && <div className="wgg-empty"><ShieldCheck size={21} /><strong>Protection action prepared</strong><span>{prepared.symbol} deposit · {prepared.amountBaseUnits} base units · {prepared.instructionCount} instructions. Review it in your wallet before approval.</span><button className="wgg-primary" onClick={() => void signAndSendPrepared()} disabled={signing}>{signing ? <><LoaderCircle size={14} className="wgg-spin" /> Waiting for wallet</> : <>Review & sign <ArrowRight size={14} /></>}</button>{signature && <span>Confirmed transaction: {signature}</span>}</div>}
         {!loading && positions.length === 0 && <div className="wgg-empty"><AlertTriangle size={21} /><strong>No xStock-backed Kamino obligation found</strong><span>The scan completed against mainnet and no fake position was inserted.</span></div>}
         {loading && <div className="wgg-empty"><LoaderCircle size={21} className="wgg-spin" /><strong>Reading Kamino, Pyth and weekend history</strong><span>This is a read-only mainnet scan.</span></div>}
         {!loading && positions.length > 0 && <div className="wgg-position-list">{positions.map((position) => {
