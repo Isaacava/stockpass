@@ -9,6 +9,21 @@ export type PythPrice = {
 
 export type PythPriceMap = Record<string, PythPrice>;
 
+export type WeekendGapSummary = {
+  sampleCount: number;
+  medianGapPct: number | null;
+  p75GapPct: number | null;
+  p90GapPct: number | null;
+  maxDownsideGapPct: number | null;
+  typicalWeekendGapPct: number | null;
+  windowStart: string;
+  windowEnd: string;
+  methodology: string;
+  feedId: string;
+};
+
+export type WeekendGapMap = Record<string, WeekendGapSummary>;
+
 export async function fetchPythPrices(symbols: string[]): Promise<PythPriceMap> {
   const unique = Array.from(new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean)));
   if (!unique.length) return {};
@@ -18,6 +33,17 @@ export async function fetchPythPrices(symbols: string[]): Promise<PythPriceMap> 
   });
   if (error) throw error;
   return (data?.prices ?? {}) as PythPriceMap;
+}
+
+export async function fetchWeekendGapSummaries(symbols: string[], weeks = 13): Promise<WeekendGapMap> {
+  const unique = Array.from(new Set(symbols.map((symbol) => symbol.trim().toUpperCase()).filter(Boolean)));
+  if (!unique.length) return {};
+
+  const { data, error } = await supabase.functions.invoke('wgg-weekend-gap', {
+    body: { symbols: unique, weeks },
+  });
+  if (error) throw error;
+  return (data?.summary ?? {}) as WeekendGapMap;
 }
 
 export function calculateLiquidationBufferPct(currentLtvPct: number | null, liquidationLtvPct: number | null) {
