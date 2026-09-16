@@ -21,16 +21,12 @@ type PreparedProtectionAction = {
   action: KaminoAction;
 };
 
-async function loadMarketAndObligation(wallet: string, rpcUrl: string) {
+async function loadMarket(rpcUrl: string) {
   const rpc = createSolanaRpc(rpcUrl);
   const recentSlotDurationMs = await getMedianSlotDurationInMsFromLastEpochs();
   const market = await KaminoMarket.load(rpc as never, address(KAMINO_MAIN_MARKET), recentSlotDurationMs);
   if (!market) throw new Error('Kamino Main Market could not be loaded.');
-  const obligation = await market.getObligationByAddress(
-    address(await new (await import('@kamino-finance/klend-sdk')).VanillaObligation(market.getProgramId()).toPda(market.getAddress(), address(wallet))),
-  );
-  if (!obligation) throw new Error('Kamino vanilla obligation could not be reloaded for protection preparation.');
-  return { rpc, market, obligation };
+  return { rpc, market };
 }
 
 export async function prepareRepayProtectionAction(params: {
@@ -40,10 +36,7 @@ export async function prepareRepayProtectionAction(params: {
   reserveAddress: string;
   amountBaseUnits: string;
 }): Promise<PreparedProtectionAction> {
-  const rpc = createSolanaRpc(params.rpcUrl);
-  const recentSlotDurationMs = await getMedianSlotDurationInMsFromLastEpochs();
-  const market = await KaminoMarket.load(rpc as never, address(KAMINO_MAIN_MARKET), recentSlotDurationMs);
-  if (!market) throw new Error('Kamino Main Market could not be loaded.');
+  const { rpc, market } = await loadMarket(params.rpcUrl);
   const obligation = await market.getObligationByAddress(address(params.obligationAddress));
   if (!obligation) throw new Error('The selected Kamino obligation no longer exists. Refresh before preparing protection.');
   const currentLedgerInstant = await getCurrentLedgerInstant(rpc as never, 'confirmed');
@@ -80,10 +73,7 @@ export async function prepareDepositProtectionAction(params: {
   reserveAddress: string;
   amountBaseUnits: string;
 }): Promise<PreparedProtectionAction> {
-  const rpc = createSolanaRpc(params.rpcUrl);
-  const recentSlotDurationMs = await getMedianSlotDurationInMsFromLastEpochs();
-  const market = await KaminoMarket.load(rpc as never, address(KAMINO_MAIN_MARKET), recentSlotDurationMs);
-  if (!market) throw new Error('Kamino Main Market could not be loaded.');
+  const { rpc, market } = await loadMarket(params.rpcUrl);
   const obligation = await market.getObligationByAddress(address(params.obligationAddress));
   if (!obligation) throw new Error('The selected Kamino obligation no longer exists. Refresh before preparing protection.');
   const currentLedgerInstant = await getCurrentLedgerInstant(rpc as never, 'confirmed');
