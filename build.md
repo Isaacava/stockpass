@@ -33,6 +33,7 @@ Current-source verification was performed before implementation began.
 - Kamino's current mainnet Main Market address used by the SDK examples is `7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF`.
 - Pyth Core was upgraded on August 26, 2026. Current Hermes/Benchmarks requests require API-key authentication, and current historical Benchmarks queries are timestamp-based. The API key must stay server-side.
 - Pyth's current documentation distinguishes regular-session US equity feeds on Pyth Core from extended-hours equity feeds that moved to Pyth Pro. Weekend Gap Guard's risk model is designed around the requested regular-session close/open measurement rather than assuming every equity feed is 24/7 on Pyth Core.
+- Nasdaq's public earnings calendar endpoint is a current candidate source for a server-side earnings adapter; the adapter must remain server-side and should treat missing/ambiguous calendar data as unavailable rather than infer a report date. Current public references document `https://api.nasdaq.com/api/calendar/earnings?date=YYYY-MM-DD`. citeturn508859search0turn508859search4
 - Surfpool is the planned local test environment for a fork of real Solana mainnet state so demo positions can be tested without real funds.
 - STOCKLANA is currently live on the Solana hackathon site and is the target hackathon for this build.
 
@@ -162,19 +163,44 @@ The frontend now takes the next step when a position is actually `FLAGGED`:
 - builds a real `KaminoAction.buildDepositTxns()` action with the current Kamino SDK
 - exposes the resulting instruction counts as a prepared action
 
-This stage is still **prepare-only**: it does not sign, submit, or move funds. The SDK action is built against fresh on-chain state immediately before preparation. The current Kamino SDK documents `buildDepositTxns()` and `buildRepayTxns()` as the supported lending-action builders, and the action object can be converted into its instruction set with `KaminoAction.actionToIxs()`. citeturn524472search0turn797file0turn807file0
+This stage is still **prepare-only**: it does not sign, submit, or move funds. The SDK action is built against fresh on-chain state immediately before preparation. The current Kamino SDK documents `buildDepositTxns()` and `buildRepayTxns()` as supported lending-action builders, and `KaminoAction.actionToIxs()` converts the prepared action into its instruction set. fileciteturn797file0turn807file0
+
+## Build-system verification milestone
+
+The first browser bundle attempt exposed an Orca WASM dependency pulled in through the Kamino SDK. Vercel's build failed while Rollup was trying to load `orca_whirlpools_core_js_bindings_bg.wasm`.
+
+The repository already contains `vite-plugin-wasm` in `devDependencies`. Because the existing `vite.config.ts` content could not be safely replaced through the connected GitHub contents action, the build now uses two new files instead:
+
+- `vite.config.wasm.ts` — Vite + React + `vite-plugin-wasm` configuration.
+- `vercel.json` — overrides the Vercel build command to run `tsc --noEmit && vite build --config vite.config.wasm.ts`.
+
+The latest Vercel deployment for commit `1bbbb2b2e8fe4d088723d5ab6c4cf7aef2cfef7c` is currently queued; its current error log contains no error/stderr/exit events yet. It is not being marked READY until Vercel reports a completed state.
+
+## Earnings-risk milestone
+
+Added `src/lib/wggEarnings.ts`, a pure earnings-risk contract that:
+
+- accepts only a trusted calendar event
+- normalizes the symbol
+- determines whether the event is within the next five calendar days
+- retains the reported report timing (`before_open`, `after_close`, or `unspecified`)
+- explicitly returns no risk when the event is missing or invalid
+- provides a separate earnings multiplier helper for the existing weekend-risk engine
+
+The module deliberately does **not** guess earnings dates and does not yet claim live earnings data. The next step is wiring a server-side calendar adapter and validating its response before enabling the multiplier in production risk output.
 
 ## Next implementation steps
 
 1. Configure the server-side `PYTH_API_KEY` and verify live price + historical weekend-gap responses for the supported xStock underlyings.
-2. Complete wallet-signature integration for prepared Kamino actions without giving the app any standing authorization.
-3. Add repay preparation alongside the current deposit preparation, including exact debt-reserve price/decimal handling from fresh Kamino state.
-4. Add a verified earnings-calendar adapter behind the server side.
-5. Populate `wgg_monitored_positions` from trusted backend checks rather than browser-submitted balances.
-6. Build the Friday monitoring worker and `wgg_alerts` records.
-7. Reuse the existing Telegram connection pattern for opt-in notifications.
-8. Add Surfpool fixtures/cheatcodes for deterministic flagged-position demos.
-9. Run an end-to-end test before using real mainnet funds.
+2. Verify the new WASM-aware Vercel build reaches READY.
+3. Complete wallet-signature integration for prepared Kamino actions without giving the app any standing authorization.
+4. Add repay preparation alongside the current deposit preparation, including exact debt-reserve price/decimal handling from fresh Kamino state.
+5. Wire a server-side earnings-calendar adapter and treat missing calendar data as unavailable rather than inferred.
+6. Populate `wgg_monitored_positions` from trusted backend checks rather than browser-submitted balances.
+7. Build the Friday monitoring worker and `wgg_alerts` records.
+8. Reuse the existing Telegram connection pattern for opt-in notifications.
+9. Add Surfpool fixtures/cheatcodes for deterministic flagged-position demos.
+10. Run an end-to-end test before using real mainnet funds.
 
 ## Testing policy
 
