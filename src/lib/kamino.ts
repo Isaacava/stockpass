@@ -23,11 +23,17 @@ type GenericObligation = {
   };
 };
 
+type ReserveRiskConfig = {
+  liquidationThreshold?: unknown;
+  loanToValue?: unknown;
+};
+
 export type KaminoXStockCollateral = {
   symbol: string;
   mint: string;
   reserve: string;
   amount: number;
+  liquidationLtvPct: number | null;
 };
 
 export type KaminoDebtPosition = {
@@ -41,6 +47,8 @@ export type KaminoXStockPosition = {
   xStocks: KaminoXStockCollateral[];
   debts: KaminoDebtPosition[];
   ltvPct: number | null;
+  liquidationLtvPct: number | null;
+  liquidationBufferPct: number | null;
   depositValueUsd: number | null;
   borrowValueUsd: number | null;
 };
@@ -64,10 +72,22 @@ function positionAmount(position: GenericPosition) {
   return decimalNumber(position.amount ?? position.scaledAmount) ?? 0;
 }
 
+function reserveLiquidationLtvPct(reserve: unknown) {
+  const stats = (reserve as { stats?: ReserveRiskConfig } | null)?.stats;
+  const candidate = decimalNumber(stats?.liquidationThreshold);
+  if (candidate !== null && candidate > 0) return candidate <= 1 ? candidate * 100 : candidate;
+  return null;
+}
+
 /**
  * Reads real Kamino Main Market obligations using the current Kamino SDK.
  * Only obligations containing a reserve whose liquidity mint matches an
  * official Solana xStock mint are returned.
+ *
+ * liquidationBufferPct is intentionally conservative: it uses the lowest
+ * liquidation threshold among the xStock collateral reserves in the
+ * obligation minus Kamino's account LTV. This is a protection signal, not a
+ * replacement for Kamino's own liquidation engine.
  */
 export async function discoverKaminoXStockPositions(wallet: string, rpcUrl: string): Promise<KaminoXStockPosition[]> {
   if (!wallet) return [];
@@ -102,7 +122,7 @@ export async function discoverKaminoXStockPositions(wallet: string, rpcUrl: stri
       const mint = stringifyAddress(reserve.getLiquidityMint());
       const symbol = xStockByMint.get(mint);
       if (!symbol) continue;
-      xStocks.push({ symbol, mint, reserve: reserveAddress, amount: positionAmount(deposit) });
+      xStocks.push({ symbol, mint, reserve: reserveAddress, amount: positionAmount(deposit), liquidationLtvPct: reserveLiquidationLtvPct(reserve) });
     }
 
     if (!xStocks.length) continue;
@@ -121,6 +141,10 @@ export async function discoverKaminoXStockPositions(wallet: string, rpcUrl: stri
 
     const ltv = obligation.loanToValue?.();
     const ltvNumber = ltv?.toNumber?.();
+    const currentLtvPct = typeof ltvNumber === 'number' && Number.isFinite(ltvNumber) ? ltvNumber * 100 : null;
+    const liquidationLtvs = xStocks.map((stock) => stock.liquidationLtvPct).filter((value): value is number => value !== null);
+    const liquidationLtvPct = liquidationLtvs.length ? Math.min(...liquidationLtvs) : null;
+    const liquidationBufferPct = currentLtvPct !== null && liquidationLtvPct !== null ? Math.max(0, liquidationLtvPct - currentLtvPct) : null;
     const depositValue = obligation.refreshedStats?.userTotalDeposit?.toNumber?.();
     const borrowValue = obligation.refreshedStats?.userTotalBorrow?.toNumber?.();
 
@@ -128,7 +152,9 @@ export async function discoverKaminoXStockPositions(wallet: string, rpcUrl: stri
       obligation: stringifyAddress(obligation.obligationAddress),
       xStocks,
       debts,
-      ltvPct: typeof ltvNumber === 'number' && Number.isFinite(ltvNumber) ? ltvNumber * 100 : null,
+      ltvPct: currentLtvPct,
+      liquidationLtvPct,
+      liquidationBufferPct,
       depositValueUsd: typeof depositValue === 'number' && Number.isFinite(depositValue) ? depositValue : null,
       borrowValueUsd: typeof borrowValue === 'number' && Number.isFinite(borrowValue) ? borrowValue : null,
     });
