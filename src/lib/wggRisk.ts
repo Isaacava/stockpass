@@ -25,6 +25,44 @@ export function evaluateWeekendRisk(input: WeekendRiskInput): WeekendRiskResult 
   return { adjustedGapPct, deficitPct: 0, status: 'safe' };
 }
 
+/**
+ * Algebraic first-pass estimate for how much debt must be repaid to move an
+ * obligation from its current LTV to a target LTV, holding collateral value
+ * constant. This is only an action-planning estimate; the final Kamino action
+ * must be rebuilt against fresh on-chain state before signing.
+ */
+export function calculateRepayUsdForTargetLtv(
+  debtUsd: number,
+  collateralUsd: number,
+  targetLtvPct: number,
+): number {
+  if (!Number.isFinite(debtUsd) || debtUsd <= 0) return 0;
+  if (!Number.isFinite(collateralUsd) || collateralUsd <= 0) return 0;
+  if (!Number.isFinite(targetLtvPct) || targetLtvPct <= 0 || targetLtvPct >= 100) return 0;
+  const targetDebtUsd = collateralUsd * (targetLtvPct / 100);
+  return Math.max(0, debtUsd - targetDebtUsd);
+}
+
+/**
+ * Algebraic first-pass estimate for how much collateral value would need to be
+ * added to reach a target LTV, holding debt constant. Final transaction
+ * construction must use a fresh Kamino state read and exact reserve decimals.
+ */
+export function calculateCollateralUsdForTargetLtv(
+  debtUsd: number,
+  collateralUsd: number,
+  targetLtvPct: number,
+): number {
+  if (!Number.isFinite(debtUsd) || debtUsd <= 0) return 0;
+  if (!Number.isFinite(collateralUsd) || collateralUsd < 0) return 0;
+  if (!Number.isFinite(targetLtvPct) || targetLtvPct <= 0 || targetLtvPct >= 100) return 0;
+  const requiredCollateralUsd = debtUsd / (targetLtvPct / 100);
+  return Math.max(0, requiredCollateralUsd - collateralUsd);
+}
+
+/**
+ * Backward-compatible repay helper retained for any existing callers.
+ */
 export function calculateRepayUsd(debtUsd: number, currentBufferPct: number, targetBufferPct: number): number {
   if (!Number.isFinite(debtUsd) || debtUsd <= 0) return 0;
   if (!Number.isFinite(currentBufferPct) || !Number.isFinite(targetBufferPct) || targetBufferPct <= currentBufferPct) return 0;
