@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@kamino-finance/klend-sdk": "latest",
     "@reown/appkit": "^1.8.23",
     "@reown/appkit-adapter-solana": "^1.8.23",
     "@solana/web3.js": "^1.98.4",
