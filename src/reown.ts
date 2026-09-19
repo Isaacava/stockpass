@@ -10,14 +10,22 @@ export const walletConnectReady = true;
 createAppKit({
   adapters: [solanaAdapter],
   networks: [solana],
+  defaultNetwork: solana,
   projectId: STOCKPASS_REOWN_PROJECT_ID,
   metadata: {
     name: 'StockPass',
-    description: 'Onchain social trading with proof-backed positions.',
+    description: 'Weekend Gap Guard for Solana xStock collateral.',
     url: window.location.origin,
-    icons: [`${window.location.origin}/favicon.svg`]
+    icons: [window.location.origin + '/favicon.svg'],
   },
+  enableReconnect: true,
+  enableMobileFullScreen: true,
+  enableWalletGuide: false,
+  allWallets: 'ONLY_MOBILE',
   features: {
-    analytics: false
-  }
+    analytics: false,
+    email: false,
+    socials: [],
+    connectMethodsOrder: ['wallet'],
+  },
 });
