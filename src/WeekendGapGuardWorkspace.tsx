@@ -113,10 +113,11 @@ export default function WeekendGapGuardWorkspace() {
     const targetLtvPct = Math.max(1, row.position.liquidationLtvPct - risk.adjustedGapPct * 1.2);
     let amountBaseUnits = '';
     if (kind === 'deposit') {
-      if (!row.price) return;
+      if (!row.price || row.price.multiplier == null || row.price.multiplier <= 0) throw new Error('Current xStocks multiplier is unavailable; refusing to prepare an unsafe raw-token amount.');
       const neededUsd = calculateCollateralUsdForTargetLtv(row.position.borrowValueUsd ?? 0, row.position.depositValueUsd ?? 0, targetLtvPct);
-      const tokenAmount = neededUsd / row.price.price;
-      amountBaseUnits = BigInt(Math.ceil(tokenAmount * 10 ** row.stock.mintDecimals)).toString();
+      const scaledTokenAmount = neededUsd / row.price.price;
+      const rawTokenAmount = scaledTokenAmount / row.price.multiplier;
+      amountBaseUnits = BigInt(Math.ceil(rawTokenAmount * 10 ** row.stock.mintDecimals)).toString();
       if (amountBaseUnits === '0') return;
     }
 
@@ -221,7 +222,7 @@ export default function WeekendGapGuardWorkspace() {
             <div className="wgg-xstock-list">{position.xStocks.map((stock) => {
               const row = rows.find((candidate) => candidate.position.obligation === position.obligation && candidate.stock.mint === stock.mint);
               const risk = row?.risk;
-              return <div className="wgg-xstock-row" key={`${position.obligation}-${stock.mint}`}><span className="wgg-xstock-icon">{row?.symbol.slice(0, 4)}</span><div><strong>{stock.symbol}</strong><span>{stock.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} collateral units</span></div><div className="wgg-xstock-status"><span>{row?.price ? `$${row.price.price.toFixed(2)} xStocks` : 'xStocks price unavailable'}</span>{risk && <strong>{risk.status.toUpperCase()}</strong>}</div>{row && risk?.status === 'flagged' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              return <div className="wgg-xstock-row" key={`${position.obligation}-${stock.mint}`}><span className="wgg-xstock-icon">{row?.symbol.slice(0, 4)}</span><div><strong>{stock.symbol}</strong><span>{stock.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} Kamino collateral units</span></div><div className="wgg-xstock-status"><span>{row?.price ? `$${row.price.price.toFixed(2)} xStocks` : 'xStocks price unavailable'}</span>{risk && <strong>{risk.status.toUpperCase()}</strong>}</div>{row && risk?.status === 'flagged' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
   <button className="wgg-secondary" onClick={() => void prepareFix(row, 'deposit')} disabled={preparing}>
     {preparing ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} {authenticating ? 'Verify wallet' : 'Add collateral'}
   </button>
