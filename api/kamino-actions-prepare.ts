@@ -233,7 +233,7 @@ export default async function handler(req: any, res: any) {
       withdraw_amount_base_units: actionType === 'close' ? withdrawAmountBaseUnits : null,
       status: 'prepared',
       kamino_program_id: KAMINO_PROGRAM_ID,
-      metadata: { instructionCount: instructions.length, lookupTables: action.luts.map(String) },
+      metadata: { instructionCount: instructions.length, lookupTables: action.luts.map(String), preparedInstructions: instructions },
     }).select('id').single();
 
     if (recordResult.error || !recordResult.data?.id) {
