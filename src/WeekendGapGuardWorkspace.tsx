@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowRight, Bell, CircleHelp, Gauge, LoaderCircle, RefreshCw, ShieldCheck, Wallet } from 'lucide-react';
-import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
+import { AlertTriangle, ArrowRight, Bell, CircleHelp, Gauge, LoaderCircle, ShieldCheck, Wallet } from 'lucide-react';
+import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import type { KaminoXStockPosition } from './lib/kamino';
 import KaminoActionConsole from './KaminoActionConsole';
@@ -48,7 +48,6 @@ function decodeBase64(value: string): Uint8Array {
 }
 
 export default function WeekendGapGuardWorkspace() {
-  const { open } = useAppKit();
   const { walletProvider } = useAppKitProvider<WggWalletProvider>('solana');
   const { address, isConnected } = useAppKitAccount({ namespace: 'solana' });
   const [positions, setPositions] = useState<KaminoXStockPosition[]>([]);
