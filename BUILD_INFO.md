@@ -706,3 +706,15 @@ Every new feature must preserve:
 **Supabase WGG data stays namespaced and isolated.**
 
 **Unavailable upstream data must be shown as unavailable rather than guessed.**
+
+
+## Native Kamino action milestone — 2026-09-19
+
+The WGG workspace now includes a non-custodial Kamino control surface for Borrow, Lend/Supply, collateral deposit, Repay, collateral withdrawal, and self-service Close Position. The server uses the current klend action builders and fresh Kamino state before every fund-moving preparation.
+
+A new server-only wgg_platform_actions ledger records prepared and independently verified transactions. kamino-actions-verify checks that the confirmed mainnet transaction was signed by the authenticated wallet and contains the Kamino Lending program, then refreshes WGG monitoring from the resulting Kamino state.
+
+New runtime requirements:
+- SOLANA_RPC_URL must point to a dedicated authenticated Solana mainnet RPC.
+- SUPABASE_SERVICE_ROLE_KEY must be configured only on the Vercel server.
+- VITE_SOLANA_RPC_URL must point the browser at the chosen authenticated mainnet RPC for transaction confirmation and address lookup tables.
