@@ -71,6 +71,7 @@ export default function WeekendGapGuardWorkspace() {
   const [marketPrices, setMarketPrices] = useState<XStockPriceMap>({});
   const [weekendGaps, setWeekendGaps] = useState<WeekendGapMap>({});
   const [loading, setLoading] = useState(false);
+  const [scanAttempted, setScanAttempted] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [authenticating, setAuthenticating] = useState(false);
   const [signing, setSigning] = useState(false);
@@ -141,9 +142,22 @@ export default function WeekendGapGuardWorkspace() {
     setError('');
     setPrepared(null);
     setSignature('');
+    setScanAttempted(true);
     try {
-      const { discoverKaminoXStockPositions } = await import('./lib/kamino');
-      const discovered = await discoverKaminoXStockPositions(address, endpoint);
+      const sessionToken = readWalletSessionToken();
+      const clientInfo = sessionToken ? 'stockpass stockpass-session=' + sessionToken : 'stockpass';
+      const response = await fetch('/api/wgg-kamino-positions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-info': clientInfo },
+        body: JSON.stringify({ wallet: address }),
+      });
+      const text = await response.text();
+      let data: { error?: string; positions?: KaminoXStockPosition[] } | null = null;
+      try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+      if (!response.ok) {
+        throw new Error(data?.error ?? (text ? text.slice(0, 240) : 'Kamino position discovery failed.'));
+      }
+      const discovered = data?.positions ?? [];
       setPositions(discovered);
       const symbols = Array.from(new Set(discovered.flatMap((position) => position.xStocks.map((stock) => stock.symbol))));
       if (!symbols.length) {
@@ -247,7 +261,7 @@ export default function WeekendGapGuardWorkspace() {
       const latest = await connection.getLatestBlockhash('confirmed');
       const instructions = prepared.instructions.map((ix) => new TransactionInstruction({
         programId: new PublicKey(ix.programAddress),
-        data: Buffer.from(decodeBase64(ix.data)),
+        data: decodeBase64(ix.data),
         keys: ix.accounts.map((account) => ({ pubkey: new PublicKey(account.address), isSigner: account.signer, isWritable: account.writable })),
       }));
       const lookupTables = [];
@@ -286,9 +300,9 @@ export default function WeekendGapGuardWorkspace() {
   }, [authenticated]);
 
   useEffect(() => {
-    if (!authenticated || lastLoaded || loading) return;
+    if (!authenticated || scanAttempted || loading) return;
     void scan();
-  }, [authenticated, lastLoaded, loading]);
+  }, [authenticated, scanAttempted, loading]);
 
   function navigate(path: string) {
     if (window.location.pathname === path) return;
