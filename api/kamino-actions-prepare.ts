@@ -1,10 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
-import { address, createNoopSigner, createSolanaRpc, getCurrentLedgerInstant, getMedianSlotDurationInMsFromLastEpochs } from '@solana/kit';
+import { address, createNoopSigner, createSolanaRpc } from '@solana/kit';
 import {
   KaminoAction,
   KaminoMarket,
   PROGRAM_ID,
   VanillaObligation,
+  getCurrentLedgerInstant,
+  getMedianSlotDurationInMsFromLastEpochs,
 } from '@kamino-finance/klend-sdk';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
