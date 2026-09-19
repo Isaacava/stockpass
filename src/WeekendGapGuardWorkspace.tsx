@@ -236,6 +236,21 @@ export default function WeekendGapGuardWorkspace() {
 
   const authenticated = isConnected && authStatus === 'authenticated';
 
+  if (!authenticated) {
+    return <div className="wgg-auth-transition">
+      <div className="wgg-auth-panel">
+        <div className="wgg-auth-kicker"><span /> STOCKPASS / WALLET AUTH</div>
+        <span className="wgg-auth-mark">SP</span>
+        {authStatus === 'authenticating'
+          ? <><strong>Verify wallet ownership.</strong><span>Approve the StockPass authentication message in your Solana wallet.</span></>
+          : authStatus === 'error'
+            ? <><strong>Authentication needs approval.</strong><span>{authError}</span><button className="wgg-primary" onClick={() => void authenticateCurrentWallet()}>Sign to continue <ArrowRight size={14} /></button></>
+            : <><strong>Wallet connected.</strong><span>Starting the signed wallet-authentication check before opening your risk workspace.</span></>}
+        <small>Solana mainnet · wallet signature required · no custody</small>
+      </div>
+    </div>;
+  }
+
   return <div className="wgg-app">
     <header className="wgg-header">
       <div className="wgg-brand"><span className="wgg-mark">WG</span><div><strong>Weekend Gap Guard</strong><small>risk protection for xStock collateral</small></div></div>
