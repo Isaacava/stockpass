@@ -45,6 +45,11 @@ function LandingGate({ onConnect, status, error }: { onConnect: () => void; stat
 
 function ConnectedRoute({ connect }: { connect: () => void }) {
   const { isConnected } = useAppKitAccount({ namespace: 'solana' });
+  useEffect(() => {
+    if (!isConnected && window.location.pathname !== '/') {
+      window.history.replaceState({}, '', '/');
+    }
+  }, [isConnected]);
   if (!isConnected) return <LandingGate onConnect={connect} status="ready" error="" />;
   return <Suspense fallback={<div className="wgg-auth-transition"><div className="wgg-auth-panel"><span className="wgg-gate-mark">SP</span><strong>Opening your risk workspace</strong><span>Loading the authenticated Solana workspace…</span></div></div>}><Workspace /></Suspense>;
 }
