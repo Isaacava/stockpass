@@ -4,14 +4,13 @@ import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/re
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { discoverKaminoXStockPositions, type KaminoXStockPosition } from './lib/kamino';
 import KaminoActionConsole from './KaminoActionConsole';
-import { calculateCollateralUsdForTargetLtv, calculateRepayUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
+import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
 import { fetchWggMarketData, type XStockPriceMap, type WeekendGapMap } from './lib/wggMarketData';
 import { refreshWalletSession } from './lib/walletAuth';
 import { readWalletSessionToken } from './lib/walletSession';
 import './weekend-gap-guard.css';
 
 const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || '';
-const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '';
 
 type WggWalletProvider = {
   signMessage: (message: Uint8Array) => Promise<Uint8Array>;
@@ -24,7 +23,6 @@ type PreparedInstruction = {
   accounts: Array<{ address: string; signer: boolean; writable: boolean }>;
 };
 type Prepared = {
-  actionId: string;
   kind: 'deposit' | 'repay';
   symbol: string;
   amountBaseUnits: string;
@@ -63,7 +61,6 @@ export default function WeekendGapGuardWorkspace() {
   const [signature, setSignature] = useState('');
   const [error, setError] = useState('');
   const [lastLoaded, setLastLoaded] = useState<Date | null>(null);
-  const [telegramLinking, setTelegramLinking] = useState(false);
 
   const rows = useMemo<Row[]>(() => positions.flatMap((position) => position.xStocks.map((stock) => {
     const symbol = stock.symbol.replace(/x$/i, '');
@@ -86,12 +83,6 @@ export default function WeekendGapGuardWorkspace() {
     if (!endpoint) { setError('VITE_SOLANA_RPC_URL is not configured.'); return; }
     setLoading(true); setError(''); setPrepared(null); setSignature('');
     try {
-      if (!readWalletSessionToken() && walletProvider?.signMessage) {
-        await refreshWalletSession({
-          publicKey: { toBase58: () => address },
-          signMessage: walletProvider.signMessage.bind(walletProvider),
-        });
-      }
       const discovered = await discoverKaminoXStockPositions(address, endpoint);
       setPositions(discovered);
       const symbols = Array.from(new Set(discovered.flatMap((p) => p.xStocks.map((s) => s.symbol))));
@@ -107,25 +98,6 @@ export default function WeekendGapGuardWorkspace() {
           setError(`Kamino loaded, but weekend-gap history is unavailable: ${firstUnavailable}`);
         }
       }
-      const sessionToken = readWalletSessionToken();
-      if (sessionToken) {
-        try {
-          const monitorResponse = await fetch('/api/wgg-monitor', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-client-info': `stockpass stockpass-session=${sessionToken}`,
-            },
-            body: JSON.stringify({ mode: 'sync', wallet: address }),
-          });
-          if (!monitorResponse.ok) {
-            const monitorBody = await monitorResponse.json().catch(() => null) as { error?: string } | null;
-            console.warn('WGG monitoring sync failed:', monitorBody?.error ?? monitorResponse.status);
-          }
-        } catch (monitorError) {
-          console.warn('WGG monitoring sync failed:', monitorError);
-        }
-      }
       setLastLoaded(new Date());
     } catch (e) {
       setPositions([]); setMarketPrices({}); setWeekendGaps({});
@@ -133,59 +105,20 @@ export default function WeekendGapGuardWorkspace() {
     } finally { setLoading(false); }
   }
 
-  async function connectTelegram() {
-    if (!address || !TELEGRAM_BOT_USERNAME) return;
-    setTelegramLinking(true); setError('');
-    try {
-      const sessionToken = readWalletSessionToken();
-      if (!sessionToken) throw new Error('Connect and verify your wallet before linking Telegram.');
-      const response = await fetch('/api/wgg-telegram-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-info': `stockpass stockpass-session=${sessionToken}` },
-        body: JSON.stringify({ wallet: address }),
-      });
-      const data = await response.json().catch(() => null) as { token?: string; error?: string } | null;
-      if (!response.ok || !data?.token) throw new Error(data?.error ?? 'Could not create a Telegram link.');
-      window.location.assign(`https://t.me/${TELEGRAM_BOT_USERNAME}?start=link_${encodeURIComponent(data.token)}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Telegram linking failed.');
-    } finally {
-      setTelegramLinking(false);
-    }
-  }
   async function prepareFix(row: Row, kind: 'deposit' | 'repay') {
     if (!address || !row.gap || row.position.liquidationLtvPct == null || row.position.liquidationBufferPct == null) return;
     const typicalGap = row.gap.typicalWeekendGapPct ?? 0;
     const risk = evaluateWeekendRisk({ currentBufferPct: row.position.liquidationBufferPct, typicalWeekendGapPct: typicalGap });
     if (risk.status !== 'flagged') return;
-
     const targetLtvPct = Math.max(1, row.position.liquidationLtvPct - risk.adjustedGapPct * 1.2);
     let amountBaseUnits = '';
-
     if (kind === 'deposit') {
-      if (!row.price || row.price.multiplier == null || row.price.multiplier <= 0) {
-        throw new Error('Current xStocks multiplier is unavailable; refusing to prepare an unsafe raw-token amount.');
-      }
-      const neededUsd = calculateCollateralUsdForTargetLtv(
-        row.position.borrowValueUsd ?? 0,
-        row.position.depositValueUsd ?? 0,
-        targetLtvPct,
-      );
+      if (!row.price || row.price.multiplier == null || row.price.multiplier <= 0) throw new Error('Current xStocks multiplier is unavailable; refusing to prepare an unsafe raw-token amount.');
+      const neededUsd = calculateCollateralUsdForTargetLtv(row.position.borrowValueUsd ?? 0, row.position.depositValueUsd ?? 0, targetLtvPct);
       const scaledTokenAmount = neededUsd / row.price.price;
       const rawTokenAmount = scaledTokenAmount / row.price.multiplier;
-      amountBaseUnits = BigInt(Math.max(1, Math.ceil(rawTokenAmount * 10 ** row.stock.mintDecimals))).toString();
-    } else {
-      const debt = row.position.debts[0];
-      const debtUsd = row.position.borrowValueUsd ?? 0;
-      const collateralUsd = row.position.depositValueUsd ?? 0;
-      if (!debt || !Number.isFinite(debtUsd) || debtUsd <= 0 || !Number.isFinite(collateralUsd) || collateralUsd <= 0) {
-        throw new Error('Current debt and collateral values are required to prepare repayment.');
-      }
-      const repayUsd = calculateRepayUsdForTargetLtv(debtUsd, collateralUsd, targetLtvPct);
-      if (repayUsd <= 0) throw new Error('The position no longer needs the planned repayment.');
-      const debtBaseUnits = BigInt(Math.max(1, Math.floor(debt.amount * 10 ** debt.mintDecimals)));
-      const estimatedBaseUnits = BigInt(Math.max(1, Math.ceil((repayUsd / debtUsd) * Number(debtBaseUnits))));
-      amountBaseUnits = (estimatedBaseUnits > debtBaseUnits ? debtBaseUnits : estimatedBaseUnits).toString();
+      amountBaseUnits = BigInt(Math.ceil(rawTokenAmount * 10 ** row.stock.mintDecimals)).toString();
+      if (amountBaseUnits === '0') return;
     }
 
     setPreparing(true); setAuthenticating(true); setError(''); setPrepared(null); setSignature('');
@@ -196,32 +129,48 @@ export default function WeekendGapGuardWorkspace() {
         signMessage: walletProvider.signMessage.bind(walletProvider),
       });
       setAuthenticating(false);
-
       const sessionToken = readWalletSessionToken();
-      if (!sessionToken) throw new Error('Wallet session could not be established.');
-
-      const response = await fetch('/api/kamino-actions-prepare', {
+      const clientInfo = sessionToken ? `stockpass stockpass-session=${sessionToken}` : 'stockpass';
+      const response = await fetch('/api/wgg-protection-prepare', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-client-info': `stockpass stockpass-session=${sessionToken}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'x-client-info': clientInfo },
         body: JSON.stringify({
           wallet: address,
-          action: kind,
           obligationAddress: row.position.obligation,
           reserveAddress: kind === 'repay'
             ? (row.position.debts[0]?.reserve ?? '')
             : row.stock.reserve,
           amountBaseUnits,
+          targetLtvPct,
+          kind,
         }),
       });
-
       const data = await response.json().catch(() => null) as {
         error?: string;
-        actionId?: string;
         instructions?: PreparedInstruction[];
-        lookupTables?: string[]  async function signAndSendPrepared() {
+        lookupTables?: string[];
+        amountBaseUnits?: string;
+        repayUsd?: number;
+        targetLtvPct?: number;
+      } | null;
+      if (!response.ok) throw new Error(data?.error ?? 'Protection preparation failed.');
+      const payload = data;
+      if (!payload?.instructions?.length) throw new Error('Protection service returned no instructions.');
+      if (kind === 'repay' && !data?.amountBaseUnits) throw new Error('Protection service returned no computed repay amount.');
+      setPrepared({
+        kind,
+        symbol: kind === 'repay' ? (row.position.debts[0]?.mint ?? 'Debt') : row.symbol,
+        amountBaseUnits: data?.amountBaseUnits ?? amountBaseUnits,
+        instructionCount: payload.instructions.length,
+        instructions: payload.instructions,
+        lookupTables: payload.lookupTables ?? [],
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Protection preparation is not available yet.');
+    } finally { setPreparing(false); setAuthenticating(false); }
+  }
+
+  async function signAndSendPrepared() {
     if (!address || !prepared || !walletProvider) return;
     setSigning(true); setError(''); setSignature('');
     try {
@@ -242,29 +191,16 @@ export default function WeekendGapGuardWorkspace() {
       const signed = await walletProvider.signTransaction(transaction);
       const txSignature = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 2 });
       await connection.confirmTransaction({ signature: txSignature, ...latest }, 'confirmed');
-
-      const sessionToken = readWalletSessionToken();
-      if (!sessionToken) throw new Error('Wallet session expired before action verification.');
-      const verifyResponse = await fetch('/api/kamino-actions-verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-client-info': `stockpass stockpass-session=${sessionToken}` },
-        body: JSON.stringify({ wallet: address, actionId: prepared.actionId, signature: txSignature }),
-      });
-      const verifyBody = await verifyResponse.json().catch(() => null) as { error?: string } | null;
-      if (!verifyResponse.ok) throw new Error(verifyBody?.error ?? 'Confirmed transaction could not be verified by StockPass.');
-
       setSignature(txSignature);
-      setPrepared(null);
-      await scan();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Wallet signing, submission, or verification failed.');
+      setError(e instanceof Error ? e.message : 'Wallet signing or transaction submission failed.');
     } finally { setSigning(false); }
   }
 
   return <div className="wgg-app">
     <header className="wgg-header">
       <div className="wgg-brand"><span className="wgg-mark">WG</span><div><strong>Weekend Gap Guard</strong><small>risk protection for xStock collateral</small></div></div>
-      <div className="wgg-header-right"><span className="wgg-mainnet"><i /> SOLANA MAINNET</span>{isConnected && TELEGRAM_BOT_USERNAME && <button className="wgg-secondary" onClick={() => void connectTelegram()} disabled={telegramLinking}>{telegramLinking ? 'Linking…' : 'Connect Telegram'}</button>}{isConnected ? <div className="wgg-wallet"><Wallet size={14} />{address ? `${address.slice(0, 4)}…${address.slice(-4)}` : 'Connected'}</div> : <button className="wgg-connect" onClick={() => void open()}>Connect wallet</button>}</div>
+      <div className="wgg-header-right"><span className="wgg-mainnet"><i /> SOLANA MAINNET</span>{isConnected ? <div className="wgg-wallet"><Wallet size={14} />{address ? `${address.slice(0, 4)}…${address.slice(-4)}` : 'Connected'}</div> : <button className="wgg-connect" onClick={() => void open()}>Connect wallet</button>}</div>
     </header>
     <main className="wgg-main">
       <section className="wgg-hero">
