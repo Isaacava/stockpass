@@ -1,8 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { readWalletSessionToken } from './walletSession';
 
-export const SUPABASE_URL = 'https://sfbxpscbevnmoppgkjcr.supabase.co';
-export const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_eCgd2QEH5mUlEK5vHIonyw_v0E8QFrp';
+export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
+export const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_eCgd2QEH5mUlEK5vHIonyw_v0E8QFrp';
 
 const walletAwareFetch: typeof fetch = (input, init) => {
   const headers = new Headers(init?.headers);
