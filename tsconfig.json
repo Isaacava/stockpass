@@ -32,7 +32,9 @@
     "src/lib/walletAuth.ts",
     "src/lib/walletSession.ts",
     "src/lib/wggRisk.ts",
-    "src/lib/xstocks.ts"
+    "src/lib/xstocks.ts",
+    "src/vite-env.d.ts",
+    "src/window.d.ts"
   ],
   "exclude": [
     "src/StockPass*.tsx",
