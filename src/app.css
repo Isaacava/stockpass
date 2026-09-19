@@ -27,7 +27,9 @@
 
 :root { color-scheme: light; }
 html, body, #root { min-height: 100%; }
-html, body { background: #EEF1F7; }
+html { scrollbar-gutter: stable; }
+html, body { background: #EEF1F7; overflow-x: hidden; }
+#root { width: 100%; min-width: 0; }
 body { margin: 0; color: #0E1428; font-family: "Inter", ui-sans-serif, system-ui, sans-serif; }
 button, input, select { font: inherit; }
 button:disabled { cursor: not-allowed; opacity: .52; }
@@ -36,7 +38,10 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 .sp-dapp {
+  width: 100%;
+  min-width: 0;
   min-height: 100vh;
+  overflow-x: clip;
   background: #EEF1F7;
   color: #0E1428;
 }
@@ -92,6 +97,7 @@ button:disabled { cursor: not-allowed; opacity: .52; }
 @media (min-width: 700px) { .sp-network-button { display: flex; } }
 
 .sp-main {
+  width: 100%;
   max-width: 840px;
   margin: 0 auto;
   padding: 0 16px 112px;
