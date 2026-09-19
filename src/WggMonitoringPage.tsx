@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Bell, CheckCircle2, RefreshCw, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Activity, AlertTriangle, Bell, CheckCircle2, RefreshCw, ShieldAlert, ShieldCheck, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { readWalletSessionToken } from './lib/walletSession';
 
@@ -47,12 +47,12 @@ export default function WggMonitoringPage({address}:Props){
     <section className="mt-4 overflow-hidden border border-sp-border bg-sp-panel">
       <div className="border-b border-sp-border px-5 py-4"><div className="font-mono text-[8px] uppercase tracking-[.15em] text-slate-600">Pipeline</div><div className="mt-1 text-sm font-semibold">What StockPass refreshes</div></div>
       <div className="grid md:grid-cols-2 xl:grid-cols-4">
-        {[
+        {([
           [Activity,'Kamino','Collateral, debt and liquidation state.'],
           [ShieldCheck,'xStocks','Current price and multiplier context.'],
           [ShieldAlert,'Weekend gap','Historical downside repricing scenario.'],
           [Bell,'Alerts','Persisted watch/flagged events with deduplication.'],
-        ].map(([Icon,title,body])=><div key={String(title)} className="border-b border-sp-border p-5 xl:border-r"><Icon size={17} className="text-sp-blue"/><div className="mt-5 text-[12px] font-semibold">{title}</div><div className="mt-2 text-[10px] leading-5 text-slate-600">{body}</div></div>)}
+        ] as Array<[LucideIcon, string, string]>).map(([Icon,title,body])=><div key={String(title)} className="border-b border-sp-border p-5 xl:border-r"><Icon size={17} className="text-sp-blue"/><div className="mt-5 text-[12px] font-semibold">{title}</div><div className="mt-2 text-[10px] leading-5 text-slate-600">{body}</div></div>)}
       </div>
     </section>
   </section>;
