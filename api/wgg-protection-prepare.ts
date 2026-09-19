@@ -1,10 +1,4 @@
 import { address, createNoopSigner, createSolanaRpc } from '@solana/kit';
-import {
-  KaminoAction,
-  KaminoMarket,
-  getCurrentLedgerInstant,
-  getMedianSlotDurationInMsFromLastEpochs,
-} from '@kamino-finance/klend-sdk';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY =
@@ -56,6 +50,7 @@ function json(res: any, body: unknown, status = 200) {
 }
 
 export const config = {
+  runtime: 'nodejs',
   maxDuration: 60,
 };
 
@@ -66,6 +61,13 @@ export default async function handler(req: any, res: any) {
   if (!MAINNET_RPC) return json(res, { error: 'SOLANA_RPC_URL is not configured.' }, 503);
 
   try {
+    const {
+      KaminoAction,
+      KaminoMarket,
+      getCurrentLedgerInstant,
+      getMedianSlotDurationInMsFromLastEpochs,
+    } = await import('@kamino-finance/klend-sdk');
+
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});
     const wallet = typeof body.wallet === 'string' ? body.wallet.trim() : '';
     const obligationAddress = typeof body.obligationAddress === 'string' ? body.obligationAddress.trim() : '';
