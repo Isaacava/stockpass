@@ -176,6 +176,34 @@ The repository already contains `vite-plugin-wasm` in `devDependencies`. Because
 
 The latest Vercel deployment for commit `1bbbb2b2e8fe4d088723d5ab6c4cf7aef2cfef7c` is currently queued; its current error log contains no error/stderr/exit events yet. It is not being marked READY until Vercel reports a completed state.
 
+## Wallet-authenticated protection execution milestone
+
+The protection path has now been split from the Supabase Edge runtime because bundling the Kamino SDK inside the Edge Function timed out.
+
+Added:
+
+- supabase/functions/wallet-auth version 2 with a validate action for existing wallet sessions.
+- api/wgg-protection-prepare.ts as a Vercel serverless function running the Kamino transaction builder outside the browser and outside the Supabase Edge bundle.
+- src/WeekendGapGuardWorkspace.tsx now calls the Vercel protection endpoint with the existing wallet-session token.
+- vercel.json now gives the protection function a longer execution window.
+
+The Vercel protection endpoint:
+
+1. validates the existing wallet session through wallet-auth
+2. rejects invalid Solana addresses
+3. ignores browser-supplied RPC URLs and uses Solana mainnet directly
+4. reloads the Kamino Main Market and current ledger state
+5. verifies the selected obligation belongs to the authenticated wallet
+6. builds either a Kamino repay or deposit action using fresh state
+7. returns only unsigned instruction data and lookup-table addresses
+8. leaves final signing and submission to the connected wallet
+
+No private key, signing secret, or standing transaction authorization is introduced.
+
+The obsolete Supabase wgg-protection-prepare Edge Function source was removed from the repository after the runtime bundle timeout. The browser no longer calls that function.
+
+The latest Vercel build is compiling the revised serverless architecture. It must still reach READY before the protection endpoint is considered production-verified.
+
 ## Earnings-risk milestone
 
 Added `src/lib/wggEarnings.ts`, a pure earnings-risk contract that:
