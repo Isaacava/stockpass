@@ -69,10 +69,11 @@ export async function fetchOfficialMultipliers(stocks: StockAsset[]) {
       const result = await fetchJson<MultiplierResponse>(`${XSTOCKS_API}/assets/${encodeURIComponent(stock.symbol)}/multiplier?network=Solana`);
       const raw = result.multiplier ?? result.currentMultiplier ?? result.data?.multiplier;
       const parsed = typeof raw === 'string' ? Number(raw) : raw;
-      const multiplier = typeof parsed === 'number' && Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+      const multiplier = typeof parsed === 'number' && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+      if (multiplier === null) throw new Error(`xStocks multiplier unavailable for ${stock.symbol}`);
       return [stock.symbol, multiplier] as const;
-    } catch {
-      return [stock.symbol, 1] as const;
+    } catch (error) {
+      throw error;
     }
   }));
   return Object.fromEntries(entries);
