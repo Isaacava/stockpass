@@ -34,11 +34,6 @@
     "src/lib/wggRisk.ts",
     "src/lib/xstocks.ts"
   ],
-  "references": [
-    {
-      "path": "./tsconfig.node.json"
-    }
-  ],
   "exclude": [
     "src/StockPass*.tsx",
     "src/*Social*.tsx",
