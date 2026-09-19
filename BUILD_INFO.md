@@ -764,3 +764,17 @@ The connected StockPass/WGG workspace has been restructured around a native DeFi
 ### Deployment verification state
 
 The latest source changes are committed to main. The Vercel project currently reports the older READY production deployment from commit 7c5447be683d2f96953cf7e0a7225b9269d1927c; the Vercel deployment connector available in this runtime does not expose a working manual deploy action. The current production URL therefore must not be described as containing this dashboard revision until a deployment with the new commit is shown as READY.
+
+## Authenticated app routing milestone — 2026-09-19
+
+The StockPass public landing and authenticated WGG app are now separate routes.
+
+- / is public landing only.
+- /app is the authenticated Overview dashboard only.
+- /app/positions is the dedicated live Kamino xStock positions page.
+- /app/risk is the dedicated Weekend Gap Guard protection/risk page.
+- /app/actions is the dedicated Kamino execution page for Borrow, Lend, Add Collateral, Repay, Withdraw, and Close Position.
+- The header navigation changes real browser history and URL instead of scrolling to sections on one long dashboard page.
+- Direct /app/* visits are rewritten to the SPA entry by Vercel while preserving the API function paths.
+- When wallet authentication is lost, the app returns to the public landing route; authenticated users entering / are moved to /app.
+- The Overview dashboard no longer embeds the full Positions and Actions pages.
