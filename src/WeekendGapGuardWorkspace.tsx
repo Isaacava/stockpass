@@ -7,6 +7,7 @@ import { discoverKaminoXStockPositions, type KaminoXStockPosition } from './lib/
 import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
 import { fetchPythPrices, fetchWeekendGapSummaries, type PythPriceMap, type WeekendGapMap } from './lib/pyth';
 import { supabase } from './lib/supabase';
+import { refreshWalletSession } from './lib/walletAuth';
 import { readWalletSessionToken } from './lib/walletSession';
 import './weekend-gap-guard.css';
 
@@ -49,6 +50,7 @@ export default function WeekendGapGuardWorkspace() {
   const [weekendGaps, setWeekendGaps] = useState<WeekendGapMap>({});
   const [loading, setLoading] = useState(false);
   const [preparing, setPreparing] = useState(false);
+  const [authenticating, setAuthenticating] = useState(false);
   const [signing, setSigning] = useState(false);
   const [prepared, setPrepared] = useState<Prepared>(null);
   const [signature, setSignature] = useState('');
@@ -104,8 +106,14 @@ export default function WeekendGapGuardWorkspace() {
     const tokenAmount = neededUsd / row.price.price;
     const amountBaseUnits = BigInt(Math.ceil(tokenAmount * 10 ** row.stock.mintDecimals)).toString();
     if (amountBaseUnits === '0') return;
-    setPreparing(true); setError(''); setPrepared(null); setSignature('');
+    setPreparing(true); setAuthenticating(true); setError(''); setPrepared(null); setSignature('');
     try {
+      if (!walletProvider?.signMessage) throw new Error('Connected wallet does not support message signing.');
+      await refreshWalletSession({
+        publicKey: { toBase58: () => address },
+        signMessage: walletProvider.signMessage.bind(walletProvider),
+      });
+      setAuthenticating(false);
       const sessionToken = readWalletSessionToken();
       const clientInfo = sessionToken ? `stockpass stockpass-session=${sessionToken}` : 'stockpass';
       const response = await fetch('/api/wgg-protection-prepare', {
@@ -126,7 +134,7 @@ export default function WeekendGapGuardWorkspace() {
       setPrepared({ symbol: row.symbol, amountBaseUnits, instructionCount: payload.instructions.length, instructions: payload.instructions, lookupTables: payload.lookupTables ?? [] });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Protection preparation is not available yet.');
-    } finally { setPreparing(false); }
+    } finally { setPreparing(false); setAuthenticating(false); }
   }
 
   async function signAndSendPrepared() {
@@ -181,7 +189,7 @@ export default function WeekendGapGuardWorkspace() {
             <div className="wgg-xstock-list">{position.xStocks.map((stock) => {
               const row = rows.find((candidate) => candidate.position.obligation === position.obligation && candidate.stock.mint === stock.mint);
               const risk = row?.risk;
-              return <div className="wgg-xstock-row" key={`${position.obligation}-${stock.mint}`}><span className="wgg-xstock-icon">{row?.symbol.slice(0, 4)}</span><div><strong>{stock.symbol}</strong><span>{stock.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} collateral units</span></div><div className="wgg-xstock-status"><span>{row?.price ? `$${row.price.price.toFixed(2)} Pyth` : 'Pyth pending'}</span>{risk && <strong>{risk.status.toUpperCase()}</strong>}</div>{row && risk?.status === 'flagged' && <button className="wgg-secondary" onClick={() => void prepareFix(row)} disabled={preparing}>{preparing ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} Prepare fix</button>}</div>;
+              return <div className="wgg-xstock-row" key={`${position.obligation}-${stock.mint}`}><span className="wgg-xstock-icon">{row?.symbol.slice(0, 4)}</span><div><strong>{stock.symbol}</strong><span>{stock.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} collateral units</span></div><div className="wgg-xstock-status"><span>{row?.price ? `$${row.price.price.toFixed(2)} Pyth` : 'Pyth pending'}</span>{risk && <strong>{risk.status.toUpperCase()}</strong>}</div>{row && risk?.status === 'flagged' && <button className="wgg-secondary" onClick={() => void prepareFix(row)} disabled={preparing}>{preparing ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} {authenticating ? 'Verify wallet' : 'Prepare fix'}</button>}</div>;
             })}</div>
             <div className="wgg-position-metrics"><div><span>Liquidation LTV</span><strong>{position.liquidationLtvPct != null ? `${position.liquidationLtvPct.toFixed(2)}%` : '—'}</strong></div><div><span>Current buffer</span><strong>{position.liquidationBufferPct != null ? `${position.liquidationBufferPct.toFixed(2)} pts` : '—'}</strong></div><div><span>Typical weekend gap</span><strong>{leadGap?.typicalWeekendGapPct != null ? `${leadGap.typicalWeekendGapPct.toFixed(2)}%` : '—'}</strong></div><div><span>Borrow value</span><strong>{position.borrowValueUsd != null ? `$${position.borrowValueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</strong></div></div>
           </article>;
