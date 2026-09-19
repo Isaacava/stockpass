@@ -801,3 +801,23 @@ The Vercel build failure from commit `d2def876b69ef7acdbbbb94502fa988a8bc22ff0` 
 The affected `WggDashboard` prop is now passed as `address ?? null`. The large npm ERESOLVE output in that log was peer-dependency warnings; the command actually stopped on the TypeScript error above.
 
 A fresh local TypeScript build could not be executed in the current tooling environment because outbound GitHub DNS resolution is unavailable. The source-side TypeScript error has been corrected, but the next Vercel build remains the authoritative compile verification.
+
+
+## Runtime verification — 2026-09-19
+
+The connected production symptoms were traced to three separate runtime details:
+
+- The browser scan uses the Vite variable `VITE_SOLANA_RPC_URL`. Server-only `SOLANA_RPC_URL` is intentionally not exposed to the browser. The browser endpoint now falls back to `VITE_SOLANA_MAINNET_RPC_URL` when `VITE_SOLANA_RPC_URL` is empty, and the deployed bundle must be rebuilt after changing Vercel environment values.
+- The desktop app navigation was hidden below 1050px by CSS, while the mobile navigation markup was missing from the workspace render tree. A dedicated fixed five-tab mobile navigation is now rendered for the same routes.
+- Wallet authentication is confirmed live against the existing Supabase project `sfbxpscbevnmoppgkjcr`: the `wallet-auth` Edge Function is ACTIVE and the database contains recent wallet-auth sessions for the connected wallet. This is custom wallet authentication, not a Supabase Auth email/password user.
+
+### Supabase project alignment note
+
+The current WGG code and deployed `wallet-auth` function use:
+
+`https://sfbxpscbevnmoppgkjcr.supabase.co`
+
+The separate Supabase project named `StockPassport` (`pwcsnthuvebzfpqprslw`) currently does not contain the WGG `stockpass_wallet_auth_challenges` / `stockpass_wallet_auth_sessions` tables or the deployed `wallet-auth` Edge Function. The app therefore remains connected to the existing WGG Supabase project until the dedicated StockPassport project is intentionally migrated.
+
+The Supabase browser client now reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` from Vite environment variables with the existing project values as safe fallbacks.
+
