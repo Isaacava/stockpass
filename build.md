@@ -1,3 +1,15 @@
+## Current implementation checkpoint
+
+**Verified on 2026-09-19**
+
+- Main branch uses the WGG workspace as the live entry point; Reown is the active wallet integration.
+- The WGG protection API accepts `SOLANA_RPC_URL`, `SUPABASE_URL`, and `SUPABASE_PUBLISHABLE_KEY` from the Vercel server environment.
+- Duplicate/unreferenced WGG modules were removed: `WeekendGapGuardWorkspaceV2.tsx`, `kaminoProtection.ts`, `wggKamino.ts`, and `WalletAuthGate.tsx`.
+- TypeScript is restricted to the live WGG source dependency graph instead of checking the legacy StockPass UI tree.
+- The protection workspace compile error from the duplicate `targetLtvPct` declaration is fixed.
+- Repay preparation no longer depends on a browser Pyth price for its amount; the Vercel endpoint recalculates the repay amount from fresh Kamino debt state, live debt-reserve oracle price and mint decimals.
+- Vercel has not yet reported a READY deployment after these changes, so end-to-end completion is still gated on build verification and one real wallet-authenticated prepare/sign smoke test.
+
 # Weekend Gap Guard build log
 
 ## Project direction
