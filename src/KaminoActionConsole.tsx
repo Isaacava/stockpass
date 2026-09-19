@@ -8,6 +8,7 @@ import { Connection, PublicKey, TransactionInstruction, TransactionMessage, Vers
 import { type KaminoXStockPosition } from './lib/kamino';
 import { refreshWalletSession } from './lib/walletAuth';
 import { readWalletSessionToken } from './lib/walletSession';
+import { SOLANA_MAINNET_RPC } from './config';
 
 type WalletProvider={signMessage:(message:Uint8Array)=>Promise<Uint8Array>;signTransaction:<T>(transaction:T)=>Promise<T>};
 type ReserveOption={address:string;symbol:string;mint:string;decimals:number;oraclePrice:number};
@@ -139,7 +140,7 @@ export default function KaminoActionConsole({address,walletProvider,positions,on
     if(!address||!walletProvider||!prepared)return;
     setSigning(true);setError('');setVerified('');
     try{
-      const rpcUrl=import.meta.env.VITE_SOLANA_RPC_URL||import.meta.env.VITE_SOLANA_MAINNET_RPC_URL||'';
+      const rpcUrl=SOLANA_MAINNET_RPC;
       if(!rpcUrl)throw new Error('VITE_SOLANA_RPC_URL is not configured.');
       const connection=new Connection(rpcUrl,'confirmed');
       const latest=await connection.getLatestBlockhash('confirmed');
