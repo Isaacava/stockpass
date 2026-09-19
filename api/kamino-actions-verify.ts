@@ -13,27 +13,24 @@ function json(res: any, body: unknown, status = 200) {
 
 function base58ToBase64(value: string) {
   const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  if (!value) return '';
-  const bytes = [0];
+  let decodedNumber = 0n;
   for (const char of value) {
     const index = alphabet.indexOf(char);
     if (index < 0) throw new Error('Invalid base58 instruction data.');
-    let carry = index;
-    for (let i = 0; i < bytes.length; i += 1) {
-      const next = bytes[i] * 58 + carry;
-      bytes[i] = next & 255;
-      carry = next >> 8;
-    }
-    while (carry > 0) {
-      bytes.push(carry & 255);
-      carry >>= 8;
-    }
+    decodedNumber = decodedNumber * 58n + BigInt(index);
   }
+
+  const bytes: number[] = [];
+  while (decodedNumber > 0n) {
+    bytes.unshift(Number(decodedNumber & 255n));
+    decodedNumber >>= 8n;
+  }
+
   let leadingZeros = 0;
   for (let i = 0; i < value.length && value[i] === '1'; i += 1) leadingZeros += 1;
-  const decoded = new Uint8Array(leadingZeros + bytes.length);
-  for (let i = 0; i < bytes.length; i += 1) decoded[decoded.length - 1 - i] = bytes[i];
-  return Buffer.from(decoded).toString('base64');
+  if (leadingZeros) bytes.unshift(...Array.from({ length: leadingZeros }, () => 0));
+
+  return Buffer.from(bytes).toString('base64');
 }
 
 function actualInstructionFingerprint(instruction: any) {
