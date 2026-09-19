@@ -125,6 +125,7 @@ export default function WeekendGapGuardWorkspace() {
       clearWalletSession();
       setAuthStatus('signed_out');
       setAuthError('');
+      setScanAttempted(false);
       return;
     }
     if (authStatus === 'authenticated' || authStatus === 'authenticating') return;
