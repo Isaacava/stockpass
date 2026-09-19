@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, ArrowRight, BarChart3, Bell, Blocks, CircleHelp, Database, Gauge, LoaderCircle, LockKeyhole, Radar, RefreshCw, ShieldCheck, Wallet } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Bell, CircleHelp, Gauge, LoaderCircle, RefreshCw, ShieldCheck, Wallet } from 'lucide-react';
 import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { discoverKaminoXStockPositions, type KaminoXStockPosition } from './lib/kamino';
@@ -197,228 +197,47 @@ export default function WeekendGapGuardWorkspace() {
     } finally { setSigning(false); }
   }
 
-
   return <div className="wgg-app">
-    <header className="wgg-nav">
-      <a className="wgg-brand-lockup" href="/" aria-label="StockPass">
-        <span className="wgg-brand-mark"><span>SP</span></span>
-        <span className="wgg-brand-word"><strong>STOCKPASS</strong><small>WEEKEND GAP GUARD</small></span>
-      </a>
-
-      <div className="wgg-nav-center">
-        <span className="wgg-nav-signal"><i /> SOLANA MAINNET</span>
-        <span className="wgg-nav-divider">/</span>
-        <span className="wgg-nav-context">{isConnected ? 'RISK WORKSPACE' : 'COLLATERAL RISK LAYER'}</span>
-      </div>
-
-      <div className="wgg-nav-actions">
-        {isConnected && <span className="wgg-wallet-chip"><Wallet size={14} /> {address ? address.slice(0, 4) + '…' + address.slice(-4) : 'Connected'}</span>}
-        {!isConnected ? (
-          <button className="wgg-nav-button" onClick={() => void open()}>Connect wallet <ArrowRight size={14} /></button>
-        ) : (
-          <button className="wgg-nav-button wgg-nav-button-dark" onClick={() => void scan()} disabled={loading}>
-            {loading ? <LoaderCircle size={14} className="wgg-spin" /> : <RefreshCw size={14} />}
-            {loading ? 'Reading' : 'Refresh'}
-          </button>
-        )}
-      </div>
+    <header className="wgg-header">
+      <div className="wgg-brand"><span className="wgg-mark">WG</span><div><strong>Weekend Gap Guard</strong><small>risk protection for xStock collateral</small></div></div>
+      <div className="wgg-header-right"><span className="wgg-mainnet"><i /> SOLANA MAINNET</span>{isConnected ? <div className="wgg-wallet"><Wallet size={14} />{address ? `${address.slice(0, 4)}…${address.slice(-4)}` : 'Connected'}</div> : <button className="wgg-connect" onClick={() => void open()}>Connect wallet</button>}</div>
     </header>
-
-    {!isConnected ? (
-      <main className="wgg-landing">
-        <section className="wgg-landing-hero">
-          <div className="wgg-landing-copy">
-            <div className="wgg-kicker"><span /> MARKET RISK / 01</div>
-            <h1>Protect the position<br /><em>when the market sleeps.</em></h1>
-            <p className="wgg-landing-lede">
-              Weekend Gap Guard reads real Kamino xStock collateral on Solana, compares the live liquidation buffer with historical Friday-to-next-session gaps, and turns a risk signal into a wallet-approved action.
-            </p>
-            <div className="wgg-landing-actions">
-              <button className="wgg-hero-button" onClick={() => void open()}>Enter the guard <ArrowRight size={16} /></button>
-              <a className="wgg-text-link" href="#method">See how it works <span>↘</span></a>
-            </div>
-            <div className="wgg-landing-stats" aria-label="Product principles">
-              <div><strong>01</strong><span>Read Kamino state</span></div>
-              <div><strong>02</strong><span>Measure weekend gap</span></div>
-              <div><strong>03</strong><span>Approve protection</span></div>
-            </div>
-          </div>
-
-          <div className="wgg-landing-visual" aria-label="Weekend risk model preview">
-            <div className="wgg-visual-topline"><span>FRIDAY CHECK / 16:00 ET</span><span className="wgg-live-badge"><i /> READY</span></div>
-            <div className="wgg-radar-stage">
-              <div className="wgg-radar"><span className="ring ring-one" /><span className="ring ring-two" /><span className="ring ring-three" /><span className="cross cross-x" /><span className="cross cross-y" /><b className="radar-dot" /></div>
-              <div className="wgg-radar-label top">LIQUIDATION BUFFER</div>
-              <div className="wgg-radar-label left">FRIDAY CLOSE</div>
-              <div className="wgg-radar-label right">NEXT SESSION</div>
-              <div className="wgg-radar-label bottom">P75 DOWNSIDE GAP</div>
-            </div>
-            <div className="wgg-model-stack">
-              <div><span>DATA</span><strong>xStocks price</strong><small>official public market layer</small></div>
-              <div><span>HISTORY</span><strong>13 weekly samples</strong><small>Friday close → next valid session</small></div>
-              <div><span>ACTION</span><strong>Wallet approval</strong><small>no custody / no standing permission</small></div>
-            </div>
-          </div>
-        </section>
-
-        <section className="wgg-proof-rail">
-          <div><span>THE SOURCE ORDER</span><strong>Kamino state</strong><i>→</i><strong>xStocks market data</strong><i>→</i><strong>weekend model</strong><i>→</i><strong>your signature</strong></div>
-          <div><ShieldCheck size={15} /><span>Nothing here needs a demo balance to look convincing.</span></div>
-        </section>
-
-        <section id="method" className="wgg-method">
-          <div className="wgg-method-heading">
-            <div>
-              <div className="wgg-kicker"><span /> WHY THIS EXISTS / 02</div>
-              <h2>Risk changes when<br /><em>the exchange is closed.</em></h2>
-            </div>
-            <p>The product is deliberately narrow. It does not replace Kamino. It adds a weekend-aware decision layer on top of the money market you already use.</p>
-          </div>
-
-          <div className="wgg-method-grid">
-            <article className="wgg-method-card">
-              <div className="wgg-card-index">A1</div>
-              <Gauge size={19} />
-              <h3>Read the real position</h3>
-              <p>Collateral, debt, LTV and liquidation thresholds come from the wallet's live Kamino obligation on mainnet.</p>
-            </article>
-            <article className="wgg-method-card wgg-method-card-accent">
-              <div className="wgg-card-index">B2</div>
-              <BarChart3 size={19} />
-              <h3>Model the closed-market move</h3>
-              <p>Historical observations measure the downside gap from a Friday close to the next valid trading-session open.</p>
-            </article>
-            <article className="wgg-method-card">
-              <div className="wgg-card-index">C3</div>
-              <ShieldCheck size={19} />
-              <h3>Make the action explicit</h3>
-              <p>When a position is flagged, StockPass prepares a concrete Kamino transaction. Your wallet remains the final authority.</p>
-            </article>
-          </div>
-        </section>
-
-        <section className="wgg-landing-bottom">
-          <div className="wgg-bottom-panel">
-            <div><div className="wgg-kicker"><span /> BUILT FOR REAL STATE</div><h2>Connect once.<br />Judge the position.</h2></div>
-            <button className="wgg-hero-button" onClick={() => void open()}>Scan my position <ArrowRight size={16} /></button>
-          </div>
-          <div className="wgg-bottom-note">
-            <div className="wgg-note-icon"><LockKeyhole size={16} /></div>
-            <div><strong>Non-custodial by design</strong><span>StockPass can prepare transactions, but it cannot move funds without a fresh wallet signature.</span></div>
-          </div>
-        </section>
-      </main>
-    ) : (
-      <main className="wgg-workspace">
-        <div className="wgg-mobile-jump">
-          <a href="#overview">Overview</a><a href="#positions">Positions</a><a href="#control">Control</a>
-        </div>
-
-        <section id="overview" className="wgg-overview-head">
-          <div>
-            <div className="wgg-kicker"><span /> WEEKEND GAP GUARD / 03</div>
-            <h1>Your position,<br /><em>before Monday.</em></h1>
-            <p>Fresh mainnet state, live xStocks pricing, and a thirteen-week weekend-gap model in one read.</p>
-          </div>
-          <div className="wgg-overview-stamp">
-            <div className="wgg-stamp-label">LAST READ</div>
-            <strong>{lastLoaded ? lastLoaded.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}</strong>
-            <span>{lastLoaded ? 'mainnet scan completed' : 'scan not run yet'}</span>
-          </div>
-        </section>
-
-        <section className="wgg-kpi-grid">
-          <div className="wgg-kpi wgg-kpi-dark"><span>POSITIONS</span><strong>{rows.length}</strong><small>xStock collateral rows</small></div>
-          <div className="wgg-kpi wgg-kpi-alert"><span>FLAGGED</span><strong>{counts.flagged}</strong><small>requires action review</small></div>
-          <div className="wgg-kpi"><span>WATCH</span><strong>{counts.watch}</strong><small>buffer is tightening</small></div>
-          <div className="wgg-kpi"><span>SAFE</span><strong>{counts.safe}</strong><small>gap model within buffer</small></div>
-        </section>
-
-        <section id="positions" className="wgg-position-section">
-          <div className="wgg-section-title-row">
-            <div>
-              <div className="wgg-kicker"><span /> LIVE POSITION RADAR</div>
-              <h2>Kamino obligations on mainnet.</h2>
-            </div>
-            <div className="wgg-section-status"><span className="wgg-status-led" /> {loading ? 'READING' : error ? 'REVIEW' : 'LIVE'}</div>
-          </div>
-
-          {error && <div className="wgg-error"><AlertTriangle size={18} /><div><strong>Read needs attention</strong><span>{error}</span></div></div>}
-
-          {prepared && <div className="wgg-prepared-banner"><div><ShieldCheck size={18} /><div><strong>Protection action prepared</strong><span>{prepared.symbol} · {prepared.kind} · {prepared.amountBaseUnits} base units · {prepared.instructionCount} instructions</span></div></div><button className="wgg-hero-button" onClick={() => void signAndSendPrepared()} disabled={signing}>{signing ? <><LoaderCircle size={14} className="wgg-spin" /> Waiting for wallet</> : <>Review & sign <ArrowRight size={14} /></>}</button>{signature && <code>{signature}</code>}</div>}
-
-          {loading && <div className="wgg-empty-state"><LoaderCircle size={20} className="wgg-spin" /><strong>Reading Kamino, xStocks and weekend history</strong><span>Read-only mainnet scan. No positions are invented while data loads.</span></div>}
-          {!loading && rows.length === 0 && <div className="wgg-empty-state"><Radar size={21} /><strong>{error ? 'No position data loaded' : 'No xStock-backed Kamino obligation found'}</strong><span>The connected wallet was checked against the configured Kamino main market. Existing external positions are eligible too.</span><button className="wgg-secondary" onClick={() => void scan()}><RefreshCw size={13} /> Scan again</button></div>}
-
-          {!loading && rows.length > 0 && (
-            <div className="wgg-position-grid">
-              {positions.map((position) => (
-                <article className="wgg-position-card" key={position.obligation}>
-                  <div className="wgg-position-card-top">
-                    <div><span className="wgg-micro">OBLIGATION</span><strong>{position.obligation.slice(0, 6)}…{position.obligation.slice(-6)}</strong></div>
-                    <span className="wgg-ltv-chip">LTV {position.ltvPct != null ? position.ltvPct.toFixed(2) + '%' : '—'}</span>
-                  </div>
-
-                  <div className="wgg-position-assets">
-                    {position.xStocks.map((stock) => {
-                      const row = rows.find((candidate) => candidate.position.obligation === position.obligation && candidate.stock.mint === stock.mint);
-                      const risk = row?.risk;
-                      return (
-                        <div className="wgg-asset-row" key={position.obligation + '-' + stock.mint}>
-                          <div className="wgg-asset-icon">{row?.symbol.slice(0, 4)}</div>
-                          <div className="wgg-asset-main"><strong>{stock.symbol}</strong><span>{stock.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} collateral units</span></div>
-                          <div className="wgg-asset-price"><span>{row?.price ? ' + row.price.price.toFixed(2) : 'PRICE —'}</span><small>{row?.price ? 'xStocks live price' : 'price unavailable'}</small></div>
-                          {risk && <div className={'wgg-risk-tag wgg-risk-' + risk.status}><i /> {risk.status.toUpperCase()}</div>}
-                          {row && risk?.status === 'flagged' && (
-                            <div className="wgg-risk-actions">
-                              <button className="wgg-secondary" onClick={() => void prepareFix(row, 'deposit')} disabled={preparing}>{preparing ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} {authenticating ? 'Verify wallet' : 'Add collateral'}</button>
-                              {row.position.debts.length > 0 && <button className="wgg-secondary" onClick={() => void prepareFix(row, 'repay')} disabled={preparing}>{preparing ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} {authenticating ? 'Verify wallet' : 'Prepare repay'}</button>}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div className="wgg-metric-row">
-                    <div><span>LIQUIDATION LTV</span><strong>{position.liquidationLtvPct != null ? position.liquidationLtvPct.toFixed(2) + '%' : '—'}</strong></div>
-                    <div><span>BUFFER</span><strong>{position.liquidationBufferPct != null ? position.liquidationBufferPct.toFixed(2) + ' pts' : '—'}</strong></div>
-                    <div><span>WEEKEND GAP</span><strong>{(() => { const gap = position.xStocks[0]?.symbol ? weekendGaps[position.xStocks[0].symbol] : undefined; return gap?.typicalWeekendGapPct != null ? gap.typicalWeekendGapPct.toFixed(2) + '%' : '—'; })()}</strong></div>
-                    <div><span>BORROW VALUE</span><strong>{position.borrowValueUsd != null ? ' + position.borrowValueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'}</strong></div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section id="control" className="wgg-control-shell">
-          <KaminoActionConsole address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />
-        </section>
-
-        <section className="wgg-method wgg-method-dashboard">
-          <div className="wgg-method-heading">
-            <div><div className="wgg-kicker"><span /> THE DECISION CHAIN</div><h2>One source of truth per layer.</h2></div>
-            <p>Kamino owns lending state. xStocks owns current market context. The gap model measures the closed-market risk. Your wallet signs the action.</p>
-          </div>
-          <div className="wgg-chain">
-            <article><span>01</span><Blocks size={17} /><strong>KAMINO</strong><small>Collateral · debt · LTV</small></article>
-            <i>→</i>
-            <article><span>02</span><Database size={17} /><strong>XSTOCKS</strong><small>Price · multiplier · asset context</small></article>
-            <i>→</i>
-            <article><span>03</span><BarChart3 size={17} /><strong>GAP MODEL</strong><small>Friday → next session</small></article>
-            <i>→</i>
-            <article><span>04</span><ShieldCheck size={17} /><strong>WALLET</strong><small>Fresh approval every action</small></article>
-          </div>
-        </section>
-      </main>
-    )}
-
-    <footer className="wgg-footer">
-      <div><strong>STOCKPASS</strong><span>Weekend Gap Guard</span></div>
-      <div><span>Solana mainnet</span><i>·</i><span>Kamino overlay</span><i>·</i><span>non-custodial</span></div>
-      <div><CircleHelp size={13} /><span>No demo balance is presented as real.</span></div>
-    </footer>
+    <main className="wgg-main">
+      <section className="wgg-hero">
+        <div className="wgg-hero-copy"><div className="wgg-eyebrow"><span /> WEEKEND RISK MONITOR</div><h1>Know the gap<br /><em>before Monday.</em></h1><p>Read real Kamino xStock collateral, compare the live liquidation buffer with historical weekend-gap risk, and prepare a specific protection action.</p><div className="wgg-hero-actions">{!isConnected ? <button className="wgg-primary" onClick={() => void open()}>Connect wallet <ArrowRight size={15} /></button> : <button className="wgg-primary" onClick={() => void scan()} disabled={loading}>{loading ? <><LoaderCircle size={15} className="wgg-spin" /> Scanning</> : <>Scan my Kamino positions <ArrowRight size={15} /></>}</button>}<span className="wgg-hero-note"><ShieldCheck size={14} /> Read-only monitoring · fixes require wallet approval</span></div></div>
+        <div className="wgg-hero-card"><div className="wgg-card-top"><span>FRIDAY CHECK</span><span className="wgg-status-dot"><i /> {loading ? 'SCANNING' : isConnected ? 'READY' : 'WAITING'}</span></div><div className="wgg-risk-meter"><div style={{ width: `${isConnected ? Math.max(8, 100 - counts.flagged * 25 - counts.watch * 10) : 12}%` }} /></div><div className="wgg-meter-label"><span>Protection signal</span><strong>{counts.flagged ? `${counts.flagged} flagged` : counts.watch ? `${counts.watch} on watch` : rows.length ? 'Gap model loaded' : 'Waiting for scan'}</strong></div><div className="wgg-card-rule"><span>xStock rows</span><b>{rows.length || '—'}</b></div><div className="wgg-card-rule"><span>Flagged</span><b>{counts.flagged || '—'}</b></div><div className="wgg-card-rule"><span>Watch</span><b>{counts.watch || '—'}</b></div></div>
+      </section>
+      <section className="wgg-principles"><div><Gauge size={18} /><div><strong>xStocks-native price</strong><span>Current xStock pricing comes from the official xStocks public market-data layer.</span></div></div><div><Bell size={18} /><div><strong>Historical gap check</strong><span>Thirteen weeks of Friday-close to next-session-open observations feed the model.</span></div></div><div><ShieldCheck size={18} /><div><strong>Controlled protection</strong><span>A flagged position gets a specific action amount calculated before approval.</span></div></div></section>
+      {isConnected && <section className="wgg-dashboard">
+        <div className="wgg-section-head"><div><div className="wgg-eyebrow">REAL KAMINO + XSTOCKS DATA</div><h2>Your xStock-backed obligations.</h2><p>{lastLoaded ? `Mainnet scan completed ${lastLoaded.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.` : 'Scan the current Kamino Main Market to load real positions.'}</p></div><button className="wgg-secondary" onClick={() => void scan()} disabled={loading}><RefreshCw size={14} /> Refresh</button></div>
+        {error && <div className="wgg-error"><AlertTriangle size={18} /><div><strong>Action unavailable</strong><span>{error}</span></div></div>}
+        {prepared && <div className="wgg-empty"><ShieldCheck size={21} /><strong>Protection action prepared</strong><span>{prepared.symbol} {prepared.kind} · {prepared.amountBaseUnits} base units · {prepared.instructionCount} instructions. Review it in your wallet before approval.</span><button className="wgg-primary" onClick={() => void signAndSendPrepared()} disabled={signing}>{signing ? <><LoaderCircle size={14} className="wgg-spin" /> Waiting for wallet</> : <>Review & sign <ArrowRight size={14} /></>}</button>{signature && <span>Confirmed transaction: {signature}</span>}</div>}
+        {!loading && positions.length === 0 && <div className="wgg-empty"><AlertTriangle size={21} /><strong>No xStock-backed Kamino obligation found</strong><span>The scan completed against mainnet and no fake position was inserted.</span></div>}
+        {loading && <div className="wgg-empty"><LoaderCircle size={21} className="wgg-spin" /><strong>Reading Kamino, xStocks and weekend history</strong><span>This is a read-only mainnet scan.</span></div>}
+        {!loading && positions.length > 0 && <div className="wgg-position-list">{positions.map((position) => {
+          const leadSymbol = position.xStocks[0]?.symbol;
+          const leadGap = leadSymbol ? weekendGaps[leadSymbol] : undefined;
+          return <article className="wgg-position-card" key={position.obligation}>
+            <div className="wgg-position-head"><div><span className="wgg-position-label">OBLIGATION</span><strong>{position.obligation.slice(0, 6)}…{position.obligation.slice(-6)}</strong></div><span className="wgg-ltv">LTV {position.ltvPct != null ? `${position.ltvPct.toFixed(2)}%` : '—'}</span></div>
+            <div className="wgg-xstock-list">{position.xStocks.map((stock) => {
+              const row = rows.find((candidate) => candidate.position.obligation === position.obligation && candidate.stock.mint === stock.mint);
+              const risk = row?.risk;
+              return <div className="wgg-xstock-row" key={`${position.obligation}-${stock.mint}`}><span className="wgg-xstock-icon">{row?.symbol.slice(0, 4)}</span><div><strong>{stock.symbol}</strong><span>{stock.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} Kamino collateral units</span></div><div className="wgg-xstock-status"><span>{row?.price ? `$${row.price.price.toFixed(2)} xStocks` : 'xStocks price unavailable'}</span>{risk && <strong>{risk.status.toUpperCase()}</strong>}</div>{row && risk?.status === 'flagged' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+  <button className="wgg-secondary" onClick={() => void prepareFix(row, 'deposit')} disabled={preparing}>
+    {preparing ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} {authenticating ? 'Verify wallet' : 'Add collateral'}
+  </button>
+  {row.position.debts.length > 0 && <button className="wgg-secondary" onClick={() => void prepareFix(row, 'repay')} disabled={preparing}>
+    {preparing ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} {authenticating ? 'Verify wallet' : 'Prepare repay'}
+  </button>}
+</div>}</div>;
+            })}</div>
+            <div className="wgg-position-metrics"><div><span>Liquidation LTV</span><strong>{position.liquidationLtvPct != null ? `${position.liquidationLtvPct.toFixed(2)}%` : '—'}</strong></div><div><span>Current buffer</span><strong>{position.liquidationBufferPct != null ? `${position.liquidationBufferPct.toFixed(2)} pts` : '—'}</strong></div><div><span>Typical weekend gap</span><strong>{leadGap?.typicalWeekendGapPct != null ? `${leadGap.typicalWeekendGapPct.toFixed(2)}%` : '—'}</strong></div><div><span>Borrow value</span><strong>{position.borrowValueUsd != null ? `$${position.borrowValueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</strong></div></div>
+          </article>;
+        })}</div>}
+      </section>}
+      {isConnected && <KaminoActionConsole address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
+      <section className="wgg-explain"><div><div className="wgg-eyebrow">HOW IT WORKS</div><h2>Not a lending protocol.<br />A protection layer.</h2></div><div className="wgg-steps"><article><b>01</b><strong>Discover</strong><span>Read the wallet's real Kamino obligations.</span></article><article><b>02</b><strong>Assess</strong><span>Measure the live buffer against the historical gap model.</span></article><article><b>03</b><strong>Protect</strong><span>Prepare a specific Kamino action for controlled approval.</span></article></div></section>
+      <footer className="wgg-footer"><span>Weekend Gap Guard</span><span>Solana mainnet · Kamino overlay · no custody</span><span><CircleHelp size={12} /> No demo balance is presented as real.</span></footer>
+    </main>
   </div>;
-
 }
