@@ -862,3 +862,18 @@ The container environment cannot resolve GitHub DNS, so a local production build
 
 Vercel has accepted the Tailwind dependency/configuration commit, but the subsequent UI commits are currently being throttled by the Vercel deployment rate limit. The latest GitHub commit currently has a Vercel failure status pointing at the project's build-rate-limit page. A READY deployment containing the full UI rebuild has therefore not yet been independently confirmed.
 
+
+
+## Light Wallet UX rebuild — 2026-09-19
+
+The authenticated StockPass/WGG workspace has been redesigned around the supplied Trust Wallet UI/UX references without copying their visual identity.
+
+- Switched the authenticated shell from the dark protocol-console palette to a light wallet-style surface.
+- Added rounded account cards, cleaner information hierarchy, softer borders/shadows, light status chips, and a mobile-first five-tab bottom navigation.
+- Desktop navigation, account header, network state, wallet identity, dashboard surfaces, action surfaces, and monitoring surfaces now share the same light design system.
+- Kamino/risk/business logic was not replaced by mock balances or decorative UI.
+- Added src/config.ts containing explicit frontend defaults for the existing Supabase URL/key, Solana mainnet RPC, and Reown project ID.
+- Frontend config resolves the manually defined values first and only falls back to Vite/Vercel environment values when a manual value is absent.
+- Updated Vite environment declarations for the Supabase and Solana variables used by the frontend.
+
+The latest source commit before this documentation change is 9913e1f69cda690c2339f0fbef9620f3f1dfb05a. The currently reported Vercel status is still the deployment-rate-limit failure from the rapid deployment sequence; this does not independently verify the latest source as READY.
