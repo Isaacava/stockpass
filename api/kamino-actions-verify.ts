@@ -1,5 +1,7 @@
 const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 
+import { discoverKaminoXStockPositions } from '../src/lib/kamino';
+
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const MAINNET_RPC = process.env.SOLANA_RPC_URL || '';
@@ -176,7 +178,6 @@ export default async function handler(req: any, res: any) {
 
     let monitoringSynced = 0;
     try {
-      const { discoverKaminoXStockPositions } = await import('../src/lib/kamino');
       const positions = await discoverKaminoXStockPositions(wallet, MAINNET_RPC);
       for (const position of positions) {
         for (const stock of position.xStocks) {
