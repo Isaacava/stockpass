@@ -983,3 +983,34 @@ Next verification gate:
 3. Test the market-data endpoint with real xStock symbols.
 4. Verify the 13-week samples and resulting WGG risk states.
 5. Remove/archive the dormant Pyth adapters after runtime verification.
+
+
+## Kamino verification hardening milestone — 2026-09-19
+
+Added exact prepared-action verification for the native Kamino control surface.
+
+- `api/kamino-actions-prepare.ts` now stores the serialized prepared instruction set in `wgg_platform_actions.metadata`.
+- `api/kamino-actions-verify.ts` still validates the authenticated wallet signer and successful mainnet confirmation, but now also:
+  - extracts the confirmed transaction's Kamino-program instructions;
+  - decodes their base58 instruction data;
+  - compares program ID, account order and instruction data against the server-prepared instruction set;
+  - rejects confirmations that differ from what StockPass prepared.
+- This keeps the wallet flow non-custodial while making the confirmation ledger materially stronger.
+
+### xStocks multiplier correctness
+
+The protection planner now requires the current xStocks multiplier and converts desired scaled equity amount to raw Solana Token-2022 units before preparing a collateral deposit:
+
+`rawTokenAmount = desiredScaledAmount / currentMultiplier`
+
+If the current multiplier is unavailable, StockPass refuses to prepare the raw-token amount rather than assuming a multiplier of 1.
+
+This follows the current xStocks Solana integration guidance: raw balances are the transaction amount and displayed/scaled balances use the multiplier.
+
+### Latest code checkpoint
+
+- `24ff8cba29c9c16b0b5acca8df93b5e1fb60d139` — corrected exact-instruction verification decoder
+- `82766c3105272fcd666daa3f499589f26087891c` — prepared-action instruction matching
+- `b7174f262ce2ecfd33be6c78d3d4835c47b8e00d` — store prepared instruction set
+- `cb01ec2c0a44e15a904420c45630309ecc1f19c2` — xStocks multiplier-aware collateral planning
+- `33effd2dfb0daac8d4febd56c905aad5ddf20936` — market-data architecture checkpoint
