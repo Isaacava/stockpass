@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { KAMINO_MAIN_MARKET } from '../src/lib/kamino';
+const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 import { evaluateEarningsRisk, type EarningsEvent } from '../src/lib/wggEarnings';
 import {
   calculateCollateralUsdForTargetLtv,
