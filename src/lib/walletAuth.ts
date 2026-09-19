@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { clearStoredWalletSession, readWalletSession, writeWalletSession, type WalletSessionRecord } from './walletSession';
 
-type WalletSigner = {
+export type WalletSigner = {
   publicKey?: { toBase58: () => string } | null;
   signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
 };
@@ -14,9 +14,8 @@ function encodeBase58(bytes: Uint8Array) {
   for (const byte of bytes) value = value * 256n + BigInt(byte);
   let encoded = '';
   while (value > 0n) {
-    const remainder = Number(value % 58n);
-    encoded = alphabet[remainder] + encoded;
-    value = value / 58n;
+    encoded = alphabet[Number(value % 58n)] + encoded;
+    value /= 58n;
   }
   for (const byte of bytes) {
     if (byte !== 0) break;
@@ -31,6 +30,15 @@ export function loadWalletSession() {
 
 export function clearWalletSession() {
   clearStoredWalletSession();
+}
+
+async function validateSession(wallet: string, current: WalletSessionRecord) {
+  const { data, error } = await supabase.functions.invoke('wallet-auth', {
+    body: { action: 'validate', wallet },
+  });
+  if (error || !data?.wallet || data.wallet !== wallet) return false;
+  const expiresAt = Date.parse(String(data.expiresAt ?? ''));
+  return Number.isFinite(expiresAt) && expiresAt > Date.now() && Date.parse(current.expiresAt) > Date.now();
 }
 
 export async function authenticateWallet(wallet: WalletSigner): Promise<WalletAuthResult> {
@@ -67,14 +75,19 @@ export async function authenticateWallet(wallet: WalletSigner): Promise<WalletAu
 }
 
 export async function refreshWalletSession(wallet: WalletSigner) {
-  const current = loadWalletSession();
   const address = wallet.publicKey?.toBase58();
-  if (current && address && current.wallet === address) return current;
+  if (!address) throw new Error('Wallet address is unavailable.');
+
+  const current = loadWalletSession();
+  if (current && current.wallet === address && await validateSession(address, current)) {
+    return current;
+  }
+
   clearWalletSession();
   return authenticateWallet(wallet);
 }
 
 export function walletAuthHeaders(): HeadersInit {
   const session = loadWalletSession();
-  return session ? { 'x-stockpass-session': session.token } : {};
+  return session ? { 'x-client-info': `stockpass stockpass-session=${session.token}` } : {};
 }
