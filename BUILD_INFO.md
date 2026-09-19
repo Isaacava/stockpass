@@ -626,9 +626,11 @@ Required:
       |
       +----> Kamino Main Market (read-only discovery)
       |
-      +----> Supabase wgg-pyth ----> Pyth
+      +----> Vercel market-data API ----> xStocks current price + multiplier
       |
-      +----> Supabase wgg-weekend-gap ----> Pyth historical data
+      +----> Vercel market-data API ----> Twelve Data historical OHLC
+      |
+      +----> Vercel monitor ----> Twelve Data earnings calendar (optional)
       |
       v
     WGG risk engine
@@ -672,8 +674,8 @@ The WGG hackathon build is considered end-to-end complete when all of the follow
 - real wallet connects
 - wallet session verifies
 - real Kamino xStock obligation is discovered
-- real Pyth price loads
-- historical weekend-gap model loads
+- real xStocks current price loads
+- historical Twelve Data weekend-gap model loads
 - earnings risk can be supplied from a trusted provider
 - risk status is generated
 - flagged position produces a correct protection amount
@@ -718,3 +720,29 @@ New runtime requirements:
 - SOLANA_RPC_URL must point to a dedicated authenticated Solana mainnet RPC.
 - SUPABASE_SERVICE_ROLE_KEY must be configured only on the Vercel server.
 - VITE_SOLANA_RPC_URL must point the browser at the chosen authenticated mainnet RPC for transaction confirmation and address lookup tables.
+
+## Completed WGG monitoring milestone — 2026-09-19
+
+Weekend Gap Guard now includes the trusted monitoring and alert pipeline described by the specification.
+
+- `api/wgg-monitor.ts` performs authenticated manual checks and `CRON_SECRET`-protected Friday scans.
+- The browser automatically invokes a monitoring sync after scanning a wallet, enrolling existing Kamino xStock obligations into `wgg_monitored_positions`.
+- The monitor refreshes Kamino, xStocks, historical weekend gaps, and optional earnings risk before persisting risk state.
+- `wgg_alerts` are deduplicated and sent through the deployed `alerts-worker`.
+- `telegram-webhook` uses one-time wallet-authenticated link challenges stored in `wgg_telegram_link_challenges`.
+- The UI exposes the Telegram handoff only when `VITE_TELEGRAM_BOT_USERNAME` is configured.
+- Flagged Add Collateral/Repay actions now use `wgg_platform_actions` and the exact prepared-instruction verification path.
+- Pyth is not part of the active required path. xStocks supplies current market data and Twelve Data supplies historical weekend-gap statistics.
+
+### Current required environment
+
+Server: `SOLANA_RPC_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `TWELVE_DATA_API_KEY`, `CRON_SECRET`.
+
+Browser: `VITE_SOLANA_RPC_URL`, `VITE_TELEGRAM_BOT_USERNAME`.
+
+Supabase Edge Functions: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`.
+
+### Final smoke-test definition
+
+A final green build and real-wallet test must prove:
+wallet authentication → real Kamino xStock discovery → xStocks price/multiplier → Twelve Data weekend history → WGG risk → action preparation → wallet signature → mainnet confirmation → exact verification → monitored-position refresh → deduplicated alert → optional Telegram delivery.
