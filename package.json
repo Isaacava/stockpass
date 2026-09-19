@@ -37,6 +37,6 @@
     "node": "22.x"
   },
   "overrides": {
-    "rpc-websockets": "10.0.0"
+    "rpc-websockets": "10.0.1"
   }
 }
