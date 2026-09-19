@@ -1,5 +1,5 @@
-import { address, createSolanaRpc, getMedianSlotDurationInMsFromLastEpochs } from '@solana/kit';
-import { KaminoMarket } from '@kamino-finance/klend-sdk';
+import { address, createSolanaRpc } from '@solana/kit';
+import { KaminoMarket, getMedianSlotDurationInMsFromLastEpochs } from '@kamino-finance/klend-sdk';
 
 const MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 
