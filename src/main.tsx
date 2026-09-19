@@ -5,7 +5,6 @@ import './mobile-safety.css';
 import './reown';
 import WeekendGapGuardWorkspace from './WeekendGapGuardWorkspace';
 
-const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
 
 class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
