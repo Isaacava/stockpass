@@ -3,13 +3,14 @@ import { AlertTriangle, ArrowRight, Bell, CircleHelp, Gauge, LoaderCircle, Refre
 import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { discoverKaminoXStockPositions, type KaminoXStockPosition } from './lib/kamino';
+import KaminoActionConsole from './KaminoActionConsole';
 import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
 import { fetchPythPrices, fetchWeekendGapSummaries, type PythPriceMap, type WeekendGapMap } from './lib/pyth';
 import { refreshWalletSession } from './lib/walletAuth';
 import { readWalletSessionToken } from './lib/walletSession';
 import './weekend-gap-guard.css';
 
-const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || '';
 
 type WggWalletProvider = {
   signMessage: (message: Uint8Array) => Promise<Uint8Array>;
@@ -79,6 +80,7 @@ export default function WeekendGapGuardWorkspace() {
 
   async function scan() {
     if (!address) return;
+    if (!endpoint) { setError('VITE_SOLANA_RPC_URL is not configured.'); return; }
     setLoading(true); setError(''); setPrepared(null); setSignature('');
     try {
       const discovered = await discoverKaminoXStockPositions(address, endpoint);
@@ -229,6 +231,7 @@ export default function WeekendGapGuardWorkspace() {
           </article>;
         })}</div>}
       </section>}
+      {isConnected && <KaminoActionConsole address={address} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
       <section className="wgg-explain"><div><div className="wgg-eyebrow">HOW IT WORKS</div><h2>Not a lending protocol.<br />A protection layer.</h2></div><div className="wgg-steps"><article><b>01</b><strong>Discover</strong><span>Read the wallet's real Kamino obligations.</span></article><article><b>02</b><strong>Assess</strong><span>Measure the live buffer against the historical gap model.</span></article><article><b>03</b><strong>Protect</strong><span>Prepare a specific Kamino action for controlled approval.</span></article></div></section>
       <footer className="wgg-footer"><span>Weekend Gap Guard</span><span>Solana mainnet · Kamino overlay · no custody</span><span><CircleHelp size={12} /> No demo balance is presented as real.</span></footer>
     </main>
