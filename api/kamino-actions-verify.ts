@@ -11,6 +11,56 @@ function json(res: any, body: unknown, status = 200) {
   res.status(status).setHeader('Cache-Control', 'no-store').json(body);
 }
 
+function base58ToBase64(value: string) {
+  const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  if (!value) return '';
+  const bytes = [0];
+  for (const char of value) {
+    const index = alphabet.indexOf(char);
+    if (index < 0) throw new Error('Invalid base58 instruction data.');
+    let carry = index;
+    for (let i = 0; i < bytes.length; i += 1) {
+      const next = bytes[i] * 58 + carry;
+      bytes[i] = next & 255;
+      carry = next >> 8;
+    }
+    while (carry > 0) {
+      bytes.push(carry & 255);
+      carry >>= 8;
+    }
+  }
+  let leadingZeros = 0;
+  for (let i = 0; i < value.length && value[i] === '1'; i += 1) leadingZeros += 1;
+  const decoded = new Uint8Array(leadingZeros + bytes.length);
+  for (let i = 0; i < bytes.length; i += 1) decoded[decoded.length - 1 - i] = bytes[i];
+  return Buffer.from(decoded).toString('base64');
+}
+
+function actualInstructionFingerprint(instruction: any) {
+  const programId = String(instruction.programId || '');
+  const accounts = Array.isArray(instruction.accounts)
+    ? instruction.accounts.map((account: any) => typeof account === 'string' ? account : String(account?.pubkey || account)).join(',')
+    : '';
+  const data = typeof instruction.data === 'string' ? base58ToBase64(instruction.data) : '';
+  return { programId, accounts, data };
+}
+
+function expectedInstructionFingerprint(instruction: any) {
+  return {
+    programId: String(instruction.programAddress || ''),
+    accounts: Array.isArray(instruction.accounts)
+      ? instruction.accounts.map((account: any) => String(account.address || '')).join(',')
+      : '',
+    data: String(instruction.data || ''),
+  };
+}
+
+function fingerprintsEqual(actual: any, expected: any) {
+  return actual.programId === expected.programId
+    && actual.accounts === expected.accounts
+    && actual.data === expected.data;
+}
+
 async function loadConfirmedTransaction(connection: Connection, signature: string) {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const tx = await connection.getParsedTransaction(signature, {
@@ -89,11 +139,31 @@ export default async function handler(req: any, res: any) {
     const signerPresent = tx.transaction.message.accountKeys.some(
       (key) => key.pubkey.toBase58() === wallet && key.signer,
     );
-    const kaminoInstructionPresent = tx.transaction.message.instructions.some(
-      (instruction: any) => String(instruction.programId || '') === KAMINO_PROGRAM_ID,
-    );
-    if (!signerPresent || !kaminoInstructionPresent) {
-      return json(res, { error: 'Confirmed transaction does not match the authenticated wallet and Kamino program.' }, 422);
+    const actualKaminoInstructions = tx.transaction.message.instructions
+      .filter((instruction: any) => String(instruction.programId || '') === KAMINO_PROGRAM_ID)
+      .map(actualInstructionFingerprint);
+
+    const preparedMetadata = row.metadata && typeof row.metadata === 'object'
+      ? row.metadata as { preparedInstructions?: unknown }
+      : null;
+    const preparedInstructions = Array.isArray(preparedMetadata?.preparedInstructions)
+      ? preparedMetadata.preparedInstructions
+          .filter((instruction: any) => String(instruction.programAddress || '') === KAMINO_PROGRAM_ID)
+          .map(expectedInstructionFingerprint)
+      : [];
+
+    if (!signerPresent || !actualKaminoInstructions.length) {
+      return json(res, { error: 'Confirmed transaction does not contain the authenticated wallet signer and expected Kamino program activity.' }, 422);
+    }
+
+    if (!preparedInstructions.length || preparedInstructions.length !== actualKaminoInstructions.length) {
+      return json(res, { error: 'Confirmed transaction does not match the prepared Kamino instruction set.' }, 422);
+    }
+
+    for (let index = 0; index < preparedInstructions.length; index += 1) {
+      if (!fingerprintsEqual(actualKaminoInstructions[index], preparedInstructions[index])) {
+        return json(res, { error: 'Confirmed transaction differs from the instructions StockPass prepared.' }, 422);
+      }
     }
 
     const updateResult = await supabase
