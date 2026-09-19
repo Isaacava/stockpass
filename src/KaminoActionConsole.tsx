@@ -188,7 +188,7 @@ export default function KaminoActionConsole({
 
   return <section className="wgg-action-console">
     <div className="wgg-action-console-head">
-      <div><div className="wgg-eyebrow"><span /> KAMINO CONTROL SURFACE</div><h2>Borrow, lend, and manage from StockPass.</h2><p>Fresh Kamino state → wallet signature → independent mainnet verification. StockPass never receives custody.</p></div>
+      <div><div className="wgg-eyebrow"><span /> KAMINO CONTROL SURFACE</div><h2>Manage the position without leaving the guard.</h2><p>Borrow, lend, add collateral, repay, withdraw, or close against fresh Kamino state. WGG turns the stress scenario into a concrete action; your wallet approves every fund movement.</p></div>
       <div className="wgg-action-trust"><LockKeyhole size={15} /><span>Non-custodial</span></div>
     </div>
     <div className="wgg-action-tabs">{(Object.keys(labels) as ActionType[]).map((item) => <button key={item} className={action === item ? 'is-active' : ''} onClick={() => choose(item)}>{labels[item]}</button>)}</div>
@@ -207,7 +207,7 @@ export default function KaminoActionConsole({
 
         {action === 'close' && <label className="wgg-action-field"><span>Collateral withdrawal amount</span><div className="wgg-action-input"><input inputMode="decimal" value={withdrawAmount} onChange={(event) => setWithdrawAmount(event.target.value)} placeholder="0.00" /><strong>{collateral?.symbol || 'xStock'}</strong></div></label>}
 
-        <div className="wgg-action-submit"><div><strong>{labels[action]}</strong><span>Prepare against the latest mainnet state before approval.</span></div><button className="wgg-primary" onClick={() => void prepareAction()} disabled={preparing || signing}>{preparing ? <><LoaderCircle size={14} className="wgg-spin" /> Preparing</> : <>Prepare transaction <ArrowRight size={14} /></>}</button></div>
+        <div className="wgg-action-submit"><div><strong>{labels[action]}</strong><span>Rebuild against fresh mainnet state before approval.</span></div><button className="wgg-primary" onClick={() => void prepareAction()} disabled={preparing || signing}>{preparing ? <><LoaderCircle size={14} className="wgg-spin" /> Preparing</> : <>Prepare transaction <ArrowRight size={14} /></>}</button></div>
       </>}
     </div>
 
