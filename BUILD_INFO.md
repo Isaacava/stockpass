@@ -488,6 +488,18 @@ Supabase hosts:
 - historical weekend-gap function
 - documentation state
 
+## 2026-09-19 Runtime Hardening Checkpoint
+
+The live Vercel WGG runtime was audited against production errors and the server paths were hardened accordingly:
+
+- Kamino discovery APIs now bundle the local discovery module statically instead of using Vercel-unresolved dynamic relative imports.
+- The Kamino server module now uses a server-safe stock registry and no longer executes browser-only Vite asset configuration during Node cold start.
+- Vercel Node functions are pinned to Node 22.x.
+- `rpc-websockets` is overridden to 10.0.1 to remove the CommonJS/ESM UUID failure that affected Kamino market/action loading.
+- Telegram setup is represented as an explicit configuration state until the real bot username is supplied; no placeholder username is fabricated.
+
+GitHub Actions passed the TypeScript + WASM production build for the hardened commits. The production Kamino market endpoint has also returned HTTP 200 with live Kamino Main Market reserve data after the dependency fix. The final runtime gate is the newest Vercel deployment carrying the server-safe registry commit, followed by authenticated Guard/Monitor checks.
+
 ## Current progress
 
 ### Completed
