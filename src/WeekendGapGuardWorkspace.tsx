@@ -142,7 +142,7 @@ export default function WeekendGapGuardWorkspace() {
   async function scan() {
     if (!address) return;
     if (!endpoint) {
-      setError('A browser Solana mainnet RPC is not configured. Set VITE_SOLANA_RPC_URL in Vercel and redeploy.');
+      setError('The Solana mainnet RPC proxy is unavailable. Check Vercel SOLANA_RPC_URL and the /api/solana-rpc function.');
       return;
     }
     setLoading(true);
@@ -250,7 +250,7 @@ export default function WeekendGapGuardWorkspace() {
     setError('');
     setSignature('');
     try {
-      if (!endpoint) throw new Error('VITE_SOLANA_RPC_URL is not configured.');
+      if (!endpoint) throw new Error('The Solana mainnet RPC proxy is not configured.');
       const connection = new Connection(endpoint, 'confirmed');
       const latest = await connection.getLatestBlockhash('confirmed');
       const instructions = prepared.instructions.map((ix) => new TransactionInstruction({
