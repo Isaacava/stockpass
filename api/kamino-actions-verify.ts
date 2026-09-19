@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { Connection } from '@solana/web3.js';
-import { discoverKaminoXStockPositions, KAMINO_MAIN_MARKET } from '../src/lib/kamino';
+const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -70,7 +70,7 @@ async function loadConfirmedTransaction(connection: Connection, signature: strin
   return null;
 }
 
-export const config = { maxDuration: 60 };
+export const config = { runtime: 'nodejs', maxDuration: 60 };
 
 export default async function handler(req: any, res: any) {
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -176,6 +176,7 @@ export default async function handler(req: any, res: any) {
 
     let monitoringSynced = 0;
     try {
+      const { discoverKaminoXStockPositions } = await import('../src/lib/kamino');
       const positions = await discoverKaminoXStockPositions(wallet, MAINNET_RPC);
       for (const position of positions) {
         for (const stock of position.xStocks) {
