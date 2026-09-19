@@ -11,10 +11,7 @@ const SUPABASE_PUBLISHABLE_KEY =
   process.env.SUPABASE_PUBLISHABLE_KEY ||
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   'sb_publishable_eCgd2QEH5mUlEK5vHIonyw_v0E8QFrp';
-const MAINNET_RPC =
-  process.env.SOLANA_RPC_URL ||
-  process.env.VITE_SOLANA_RPC_URL ||
-  'https://api.mainnet-beta.solana.com';
+const MAINNET_RPC = process.env.SOLANA_RPC_URL || '';
 const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 
 type PreparedInstruction = {
@@ -65,6 +62,8 @@ export const config = {
 export default async function handler(req: any, res: any) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return json(res, { error: 'POST required' }, 405);
+
+  if (!MAINNET_RPC) return json(res, { error: 'SOLANA_RPC_URL is not configured.' }, 503);
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});
