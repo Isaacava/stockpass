@@ -11,6 +11,7 @@ import { readWalletSessionToken } from './lib/walletSession';
 import './weekend-gap-guard.css';
 
 const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || '';
+const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '';
 
 type WggWalletProvider = {
   signMessage: (message: Uint8Array) => Promise<Uint8Array>;
@@ -62,6 +63,7 @@ export default function WeekendGapGuardWorkspace() {
   const [signature, setSignature] = useState('');
   const [error, setError] = useState('');
   const [lastLoaded, setLastLoaded] = useState<Date | null>(null);
+  const [telegramLinking, setTelegramLinking] = useState(false);
 
   const rows = useMemo<Row[]>(() => positions.flatMap((position) => position.xStocks.map((stock) => {
     const symbol = stock.symbol.replace(/x$/i, '');
@@ -131,6 +133,26 @@ export default function WeekendGapGuardWorkspace() {
     } finally { setLoading(false); }
   }
 
+  async function connectTelegram() {
+    if (!address || !TELEGRAM_BOT_USERNAME) return;
+    setTelegramLinking(true); setError('');
+    try {
+      const sessionToken = readWalletSessionToken();
+      if (!sessionToken) throw new Error('Connect and verify your wallet before linking Telegram.');
+      const response = await fetch('/api/wgg-telegram-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-info': `stockpass stockpass-session=${sessionToken}` },
+        body: JSON.stringify({ wallet: address }),
+      });
+      const data = await response.json().catch(() => null) as { token?: string; error?: string } | null;
+      if (!response.ok || !data?.token) throw new Error(data?.error ?? 'Could not create a Telegram link.');
+      window.open(`https://t.me/${TELEGRAM_BOT_USERNAME}?start=link_${encodeURIComponent(data.token)}`, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Telegram linking failed.');
+    } finally {
+      setTelegramLinking(false);
+    }
+  }
   async function prepareFix(row: Row, kind: 'deposit' | 'repay') {
     if (!address || !row.gap || row.position.liquidationLtvPct == null || row.position.liquidationBufferPct == null) return;
     const typicalGap = row.gap.typicalWeekendGapPct ?? 0;
@@ -242,7 +264,7 @@ export default function WeekendGapGuardWorkspace() {
   return <div className="wgg-app">
     <header className="wgg-header">
       <div className="wgg-brand"><span className="wgg-mark">WG</span><div><strong>Weekend Gap Guard</strong><small>risk protection for xStock collateral</small></div></div>
-      <div className="wgg-header-right"><span className="wgg-mainnet"><i /> SOLANA MAINNET</span>{isConnected ? <div className="wgg-wallet"><Wallet size={14} />{address ? `${address.slice(0, 4)}…${address.slice(-4)}` : 'Connected'}</div> : <button className="wgg-connect" onClick={() => void open()}>Connect wallet</button>}</div>
+      <div className="wgg-header-right"><span className="wgg-mainnet"><i /> SOLANA MAINNET</span>{isConnected && TELEGRAM_BOT_USERNAME && <button className="wgg-secondary" onClick={() => void connectTelegram()} disabled={telegramLinking}>{telegramLinking ? 'Linking…' : 'Connect Telegram'}</button>}{isConnected ? <div className="wgg-wallet"><Wallet size={14} />{address ? `${address.slice(0, 4)}…${address.slice(-4)}` : 'Connected'}</div> : <button className="wgg-connect" onClick={() => void open()}>Connect wallet</button>}</div>
     </header>
     <main className="wgg-main">
       <section className="wgg-hero">
