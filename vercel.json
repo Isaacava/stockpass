@@ -16,5 +16,15 @@
       "path": "/api/wgg-monitor",
       "schedule": "0 21 * * 5"
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/app",
+      "destination": "/"
+    },
+    {
+      "source": "/app/:path*",
+      "destination": "/"
+    }
   ]
 }
