@@ -7,6 +7,7 @@ import { discoverKaminoXStockPositions, type KaminoXStockPosition } from './lib/
 import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
 import { fetchPythPrices, fetchWeekendGapSummaries, type PythPriceMap, type WeekendGapMap } from './lib/pyth';
 import { supabase } from './lib/supabase';
+import { readWalletSessionToken } from './lib/walletSession';
 import './weekend-gap-guard.css';
 
 const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
@@ -105,11 +106,22 @@ export default function WeekendGapGuardWorkspace() {
     if (amountBaseUnits === '0') return;
     setPreparing(true); setError(''); setPrepared(null); setSignature('');
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('wgg-protection-prepare', {
-        body: { wallet: address, obligationAddress: row.position.obligation, reserveAddress: row.stock.reserve, amountBaseUnits, kind: 'deposit', rpcUrl: endpoint },
+      const sessionToken = readWalletSessionToken();
+      const clientInfo = sessionToken ? `stockpass stockpass-session=${sessionToken}` : 'stockpass';
+      const response = await fetch('/api/wgg-protection-prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-client-info': clientInfo },
+        body: JSON.stringify({
+          wallet: address,
+          obligationAddress: row.position.obligation,
+          reserveAddress: row.stock.reserve,
+          amountBaseUnits,
+          kind: 'deposit',
+        }),
       });
-      if (fnError) throw fnError;
-      const payload = data as { instructions?: PreparedInstruction[]; lookupTables?: string[] } | null;
+      const data = await response.json().catch(() => null) as { error?: string; instructions?: PreparedInstruction[]; lookupTables?: string[] } | null;
+      if (!response.ok) throw new Error(data?.error ?? 'Protection preparation failed.');
+      const payload = data;
       if (!payload?.instructions?.length) throw new Error('Protection service returned no instructions.');
       setPrepared({ symbol: row.symbol, amountBaseUnits, instructionCount: payload.instructions.length, instructions: payload.instructions, lookupTables: payload.lookupTables ?? [] });
     } catch (e) {
