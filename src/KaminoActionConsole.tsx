@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   ArrowDownToLine, ArrowRight, ArrowUpFromLine, Check, CheckCircle2, ChevronDown,
   CircleDollarSign, CreditCard, LoaderCircle, LockKeyhole, Minus, Plus, RefreshCw,
@@ -228,5 +228,5 @@ export default function KaminoActionConsole({address,walletProvider,positions,on
 }
 
 function inputClass(){return 'w-full border border-sp-border bg-[#0a111b] px-3 py-3 text-[11px] text-slate-200 outline-none focus:border-sp-blue/60';}
-function Field({label,children}:{label:string;children:React.ReactNode}){return <label className="mt-4 block"><span className="font-mono text-[8px] uppercase tracking-[.14em] text-slate-600">{label}</span><div className="mt-2">{children}</div></label>;}
+function Field({label,children}:{label:string;children:ReactNode}){return <label className="mt-4 block"><span className="font-mono text-[8px] uppercase tracking-[.14em] text-slate-600">{label}</span><div className="mt-2">{children}</div></label>;}
 function SummaryRow({label,value}:{label:string;value:string}){return <div className="flex items-center justify-between border-b border-sp-border pb-3 text-[10px] last:border-0"><span className="text-slate-600">{label}</span><span className="text-slate-300">{value}</span></div>;}
