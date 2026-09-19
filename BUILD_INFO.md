@@ -746,3 +746,21 @@ Supabase Edge Functions: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`.
 
 A final green build and real-wallet test must prove:
 wallet authentication → real Kamino xStock discovery → xStocks price/multiplier → Twelve Data weekend history → WGG risk → action preparation → wallet signature → mainnet confirmation → exact verification → monitored-position refresh → deduplicated alert → optional Telegram delivery.
+
+## Dashboard command-center milestone — 2026-09-19
+
+The connected StockPass/WGG workspace has been restructured around a native DeFi dashboard hierarchy instead of a marketing hero:
+
+- WggDashboard.tsx is now the primary connected account surface.
+- The first viewport starts with real-account KPIs: collateral, borrowed value, max LTV, and protection state.
+- The protection panel shows current LTV, stressed LTV, liquidation boundary, distance to liquidation, and the next action without inventing balances.
+- Positions are displayed as live Kamino xStock obligations with asset, value, current/stressed LTV, risk status, and action affordances.
+- Market context is separated from account state and labels xStocks as the current-price source and Twelve Data history as the weekend-gap source.
+- The connected dashboard automatically performs the first mainnet scan after wallet authentication, so users do not land on an empty manual-scan shell.
+- Mobile behavior collapses the dense desktop position grid into stacked cards while preserving the same data hierarchy.
+- The existing Kamino action console remains below the account/risk layer so execution follows understanding rather than leading with controls.
+- No fabricated portfolio values, PnL, balances, or risk readings were added.
+
+### Deployment verification state
+
+The latest source changes are committed to main. The Vercel project currently reports the older READY production deployment from commit 7c5447be683d2f96953cf7e0a7225b9269d1927c; the Vercel deployment connector available in this runtime does not expose a working manual deploy action. The current production URL therefore must not be described as containing this dashboard revision until a deployment with the new commit is shown as READY.
