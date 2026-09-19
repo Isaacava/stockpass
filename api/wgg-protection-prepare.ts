@@ -28,7 +28,12 @@ function validAddress(value: string) {
 function b64(bytes: Uint8Array | number[] | undefined): string {
   if (!bytes) return '';
   const array = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  return Buffer.from(array).toString('base64');
+  let text = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < array.length; i += chunk) {
+    text += String.fromCharCode(...array.subarray(i, i + chunk));
+  }
+  return btoa(text);
 }
 
 function serializeInstructions(instructions: PreparedInstruction[]) {
