@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, Bell, CircleHelp, Gauge, LoaderCircle, RefreshCw, ShieldCheck, Wallet } from 'lucide-react';
 import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
-import { discoverKaminoXStockPositions, type KaminoXStockPosition } from './lib/kamino';
+import type { KaminoXStockPosition } from './lib/kamino';
 import KaminoActionConsole from './KaminoActionConsole';
 import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
 import { fetchWggMarketData, type XStockPriceMap, type WeekendGapMap } from './lib/wggMarketData';
@@ -118,6 +118,7 @@ export default function WeekendGapGuardWorkspace() {
     if (!endpoint) { setError('VITE_SOLANA_RPC_URL is not configured.'); return; }
     setLoading(true); setError(''); setPrepared(null); setSignature('');
     try {
+      const { discoverKaminoXStockPositions } = await import('./lib/kamino');
       const discovered = await discoverKaminoXStockPositions(address, endpoint);
       setPositions(discovered);
       const symbols = Array.from(new Set(discovered.flatMap((p) => p.xStocks.map((s) => s.symbol))));
