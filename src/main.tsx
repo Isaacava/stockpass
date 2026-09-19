@@ -1,9 +1,9 @@
-import React, { Suspense, lazy, useEffect, useState } from 'react';
+import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
 import './styles.css';
 import './mobile-safety.css';
 
-const Workspace = lazy(() => import('./WeekendGapGuardWorkspace'));
+const WeekendGapGuardWorkspace = lazy(() => import('./WeekendGapGuardWorkspace'));
 
 class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   state: { error: Error | null } = { error: null };
@@ -12,73 +12,43 @@ class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { 
   render() {
     if (this.state.error) {
       const message = this.state.error?.message || 'Unknown client-side error';
-      return <div className="wgg-boot-error"><div><div className="wgg-boot-error-code">STOCKPASS / CLIENT ERROR</div><h1>The workspace hit a browser error.</h1><p>{message}</p><button onClick={() => window.location.reload()}>Reload StockPass</button></div></div>;
+      return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 20, background: '#f2eee5', color: '#171717', fontFamily: 'DM Sans, system-ui, sans-serif' }}><div style={{ width: 'min(680px, 100%)', background: '#fffdf8', border: '1px solid #d7d0c3', padding: 24, boxShadow: '8px 8px 0 #d8d0c2' }}><strong style={{ display: 'block', fontSize: 20, marginBottom: 8 }}>StockPass could not render</strong><p style={{ margin: 0, color: '#716b62', lineHeight: 1.6 }}>The application hit a client-side rendering error.</p><pre style={{ margin: '16px 0 0', padding: 13, overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#111211', color: '#f7f2e9', font: '12px/1.55 monospace' }}>{message}</pre><button onClick={() => window.location.reload()} style={{ marginTop: 16, border: 0, padding: '11px 14px', background: '#2f46d0', color: '#fff', fontWeight: 800 }}>Reload StockPass</button></div></div>;
     }
     return this.props.children;
   }
 }
 
-function LandingGate({ onConnect, status, error }: { onConnect: () => void; status: 'starting' | 'ready' | 'error'; error: string }) {
-  return <div className="wgg-gate">
-    <header className="wgg-gate-nav">
-      <div className="wgg-gate-brand"><span className="wgg-gate-mark">SP</span><div><strong>STOCKPASS</strong><small>WEEKEND GAP GUARD</small></div></div>
-      <div className="wgg-gate-network"><i /> SOLANA MAINNET</div>
-    </header>
-    <main className="wgg-gate-main">
-      <section className="wgg-gate-copy">
-        <div className="wgg-gate-kicker"><span /> MARKET RISK / READY</div>
-        <h1>Protect the position<br /><em>before Monday.</em></h1>
-        <p>Connect your Solana wallet to read real Kamino xStock collateral, measure weekend-gap exposure, and unlock the protected workspace.</p>
-        <button className="wgg-gate-connect" onClick={onConnect} disabled={status === 'starting'}>{status === 'starting' ? 'Starting wallet connector…' : 'Connect Solana wallet →'}</button>
-        <div className="wgg-gate-proof"><span>Wallet ownership</span><b>signed challenge</b><span>Position state</span><b>Kamino mainnet</b><span>Market context</span><b>xStocks</b></div>
-        {error && <div className="wgg-gate-error">{error}</div>}
-      </section>
-      <aside className="wgg-gate-card">
-        <div className="wgg-gate-card-top"><span>WGG / 01</span><span><i /> ONLINE</span></div>
-        <div className="wgg-gate-orbit"><div /><span /><span /><span /></div>
-        <div className="wgg-gate-card-lines"><div><span>COLLATERAL</span><strong>KAMINO</strong></div><div><span>PRICE</span><strong>XSTOCKS</strong></div><div><span>RISK MODEL</span><strong>WEEKEND GAP</strong></div></div>
-      </aside>
-    </main>
-  </div>;
+function BootError({ label, error }: { label: string; error: Error }) {
+  return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 20, background: '#f2eee5', color: '#171717', fontFamily: 'DM Sans, system-ui, sans-serif' }}><div style={{ width: 'min(720px, 100%)', background: '#fffdf8', border: '1px solid #d7d0c3', padding: 24, boxShadow: '8px 8px 0 #d8d0c2' }}><div style={{ font: '700 9px/1 monospace', letterSpacing: '.12em', color: '#c74b30' }}>{label}</div><h1 style={{ margin: '14px 0 8px', font: '800 34px/.95 Syne, sans-serif', letterSpacing: '-.04em' }}>StockPass startup failed.</h1><p style={{ margin: 0, color: '#716b62', lineHeight: 1.65 }}>The app is now surfacing the browser-side error instead of rendering a blank screen.</p><pre style={{ margin: '16px 0 0', padding: 13, background: '#111211', color: '#f7f2e9', overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word', font: '12px/1.55 monospace' }}>{error.message}{error.stack ? `\n\n${error.stack}` : ''}</pre><button onClick={() => window.location.reload()} style={{ marginTop: 16, border: 0, padding: '11px 14px', background: '#111211', color: '#fffdf8', fontWeight: 800 }}>Retry</button></div></div>;
 }
 
-function AppShell() {
-  const [walletReady, setWalletReady] = useState(false);
-  const [status, setStatus] = useState<'starting' | 'ready' | 'error'>('starting');
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    let active = true;
-    import('./reown').then(() => {
-      if (!active) return;
-      setWalletReady(true);
-      setStatus('ready');
-    }).catch((cause) => {
-      if (!active) return;
-      const message = cause instanceof Error ? cause.message : String(cause);
-      console.error('StockPass wallet connector preload failed', cause);
-      setStatus('error');
-      setError(message);
-    });
-    return () => { active = false; };
-  }, []);
-
-  const connect = () => {
-    if (!walletReady) {
-      setStatus('starting');
-      setError('The wallet connector is still starting.');
-      return;
-    }
-    void import('./reown').then(({ appKit }) => appKit.open({ view: 'Connect', namespace: 'solana' })).catch((cause) => {
-      const message = cause instanceof Error ? cause.message : String(cause);
-      console.error('StockPass wallet modal failed to open', cause);
-      setStatus('error');
-      setError(message);
-    });
-  };
-
-  if (!walletReady) return <LandingGate onConnect={connect} status={status} error={error} />;
-  return <Suspense fallback={<LandingGate onConnect={connect} status="ready" error="" />}><Workspace /></Suspense>;
+function Loading() {
+  return <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: 24, background: '#f2eee5', color: '#171717', fontFamily: 'DM Sans, system-ui, sans-serif' }}><div style={{ textAlign: 'center' }}><div style={{ width: 42, height: 42, margin: '0 auto 14px', display: 'grid', placeItems: 'center', background: '#111211', color: '#fffdf8', font: '800 11px/1 monospace' }}>SP</div><strong style={{ display: 'block', fontSize: 16 }}>Opening StockPass</strong><span style={{ display: 'block', marginTop: 6, color: '#716b62', fontSize: 12 }}>Starting the Solana wallet connection layer…</span></div></div>;
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><AppErrorBoundary><AppShell /></AppErrorBoundary></React.StrictMode>);
+function App() {
+  return <Suspense fallback={<Loading />}><WeekendGapGuardWorkspace /></Suspense>;
+}
+
+async function bootstrap() {
+  let walletSetupError: Error | null = null;
+  try {
+    await import('./reown');
+  } catch (error) {
+    walletSetupError = error instanceof Error ? error : new Error(String(error));
+    console.error('StockPass wallet connector initialization failed', error);
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')!).render(
+    <React.StrictMode>
+      <AppErrorBoundary>
+        {walletSetupError ? <BootError label="WALLET CONNECTOR / INIT ERROR" error={walletSetupError} /> : <App />}
+      </AppErrorBoundary>
+    </React.StrictMode>,
+  );
+}
+
+void bootstrap().catch((error) => {
+  const root = document.getElementById('root');
+  if (root) root.innerHTML = `<div style="min-height:100vh;display:grid;place-items:center;padding:20px;background:#f2eee5;color:#171717;font-family:system-ui,sans-serif"><div style="max-width:720px;background:#fffdf8;border:1px solid #d7d0c3;padding:24px;box-shadow:8px 8px 0 #d8d0c2"><strong style="font-size:20px">StockPass could not start</strong><pre style="margin-top:14px;padding:13px;background:#111211;color:#fffdf8;white-space:pre-wrap;word-break:break-word">${String(error instanceof Error ? error.stack || error.message : error)}</pre></div></div>`;
+});
