@@ -1,3 +1,5 @@
+export const config = { runtime: 'nodejs', maxDuration: 30 };
+
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
