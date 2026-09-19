@@ -262,7 +262,7 @@ export default function WeekendGapGuardWorkspace() {
       const latest = await connection.getLatestBlockhash('confirmed');
       const instructions = prepared.instructions.map((ix) => new TransactionInstruction({
         programId: new PublicKey(ix.programAddress),
-        data: decodeBase64(ix.data),
+        data: Buffer.from(decodeBase64(ix.data)),
         keys: ix.accounts.map((account) => ({ pubkey: new PublicKey(account.address), isSigner: account.signer, isWritable: account.writable })),
       }));
       const lookupTables = [];
