@@ -25,9 +25,10 @@ import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/w
 import { fetchWggMarketData, type XStockPriceMap, type WeekendGapMap } from './lib/wggMarketData';
 import { clearWalletSession, refreshWalletSession } from './lib/walletAuth';
 import { readWalletSessionToken } from './lib/walletSession';
+import { SOLANA_MAINNET_RPC } from './config';
 import './app.css';
 
-const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || import.meta.env.VITE_SOLANA_MAINNET_RPC_URL || '';
+const endpoint = SOLANA_MAINNET_RPC;
 
 type WggWalletProvider = {
   signMessage: (message: Uint8Array) => Promise<Uint8Array>;
@@ -310,26 +311,48 @@ export default function WeekendGapGuardWorkspace() {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-[#070b12] text-slate-100 grid place-items-center p-5 font-sans">
-        <div className="w-full max-w-lg border border-sp-border bg-sp-panel p-6 md:p-8 shadow-[0_20px_60px_rgba(0,0,0,.32)]">
-          <div className="flex items-center gap-3 border-b border-sp-border pb-5">
-            <div className="grid size-10 place-items-center border border-white/10 bg-white text-xs font-bold text-[#070b12]">SP</div>
+      <div className="sp-dapp min-h-screen grid place-items-center px-4 py-8 sm:px-6">
+        <div className="w-full max-w-md rounded-[28px] border border-sp-border bg-white p-6 shadow-[0_20px_60px_rgba(16,24,40,.08)] sm:p-8">
+          <div className="flex items-center gap-3">
+            <div className="grid size-11 place-items-center rounded-2xl bg-[#101828] text-xs font-bold text-white shadow-sm">SP</div>
             <div>
-              <div className="text-xs font-semibold tracking-[.16em]">STOCKPASS</div>
-              <div className="mt-1 font-mono text-[9px] uppercase tracking-[.18em] text-slate-500">Weekend Gap Guard</div>
+              <div className="text-sm font-bold tracking-[.12em] text-slate-100">STOCKPASS</div>
+              <div className="mt-1 font-mono text-[8px] uppercase tracking-[.16em] text-slate-500">Weekend Gap Guard</div>
             </div>
           </div>
-          <div className="py-10">
-            <div className="mb-4 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[.18em] text-slate-500"><span className="size-1.5 rounded-full bg-emerald-400" /> Wallet authentication</div>
+
+          <div className="mt-8 rounded-2xl bg-[#f6f8ff] p-5">
+            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.14em] text-[#315efb]">
+              <span className="size-2 rounded-full bg-[#315efb]" /> Wallet verification
+            </div>
             {authStatus === 'authenticating' ? (
-              <><h1 className="text-2xl font-semibold tracking-tight">Verify wallet ownership</h1><p className="mt-3 text-sm leading-6 text-slate-400">Approve the StockPass authentication message in your Solana wallet before your account state is read.</p></>
+              <>
+                <h1 className="mt-4 text-2xl font-bold tracking-[-.03em] text-slate-100">Verify your wallet</h1>
+                <p className="mt-2 text-sm leading-6 text-slate-500">Approve the StockPass signature request. No assets move during authentication.</p>
+              </>
             ) : authStatus === 'error' ? (
-              <><h1 className="text-2xl font-semibold tracking-tight">Authentication needs approval</h1><p className="mt-3 text-sm leading-6 text-rose-300">{authError}</p><button className="mt-6 inline-flex h-11 items-center gap-2 bg-white px-4 text-sm font-semibold text-slate-950" onClick={() => void authenticateCurrentWallet()}>Sign to continue <ArrowRight size={15} /></button></>
+              <>
+                <h1 className="mt-4 text-2xl font-bold tracking-[-.03em] text-slate-100">Signature required</h1>
+                <p className="mt-2 text-sm leading-6 text-rose-600">{authError}</p>
+                <button className="sp-primary mt-5 inline-flex h-11 items-center gap-2 px-4 text-sm font-semibold" onClick={() => void authenticateCurrentWallet()}>
+                  Sign to continue <ArrowRight size={15} />
+                </button>
+              </>
             ) : (
-              <><h1 className="text-2xl font-semibold tracking-tight">Wallet connected</h1><p className="mt-3 text-sm leading-6 text-slate-400">Starting the signed wallet-authentication check before opening the risk workspace.</p></>
+              <>
+                <h1 className="mt-4 text-2xl font-bold tracking-[-.03em] text-slate-100">Wallet connected</h1>
+                <p className="mt-2 text-sm leading-6 text-slate-500">Checking signed wallet ownership before opening your account.</p>
+              </>
             )}
           </div>
-          <div className="border-t border-sp-border pt-4 font-mono text-[9px] uppercase tracking-[.15em] text-slate-500">Solana mainnet · wallet signature required · no custody</div>
+
+          <div className="mt-6 grid grid-cols-3 gap-2">
+            <div className="rounded-2xl border border-sp-border bg-white p-3"><div className="font-mono text-[8px] uppercase tracking-[.12em] text-slate-500">Network</div><div className="mt-2 text-[10px] font-semibold text-slate-200">Solana</div></div>
+            <div className="rounded-2xl border border-sp-border bg-white p-3"><div className="font-mono text-[8px] uppercase tracking-[.12em] text-slate-500">Source</div><div className="mt-2 text-[10px] font-semibold text-slate-200">Kamino</div></div>
+            <div className="rounded-2xl border border-sp-border bg-white p-3"><div className="font-mono text-[8px] uppercase tracking-[.12em] text-slate-500">Custody</div><div className="mt-2 text-[10px] font-semibold text-slate-200">None</div></div>
+          </div>
+
+          <div className="mt-6 font-mono text-[8px] uppercase tracking-[.12em] text-slate-400">Mainnet data · wallet-signed actions · non-custodial</div>
         </div>
       </div>
     );
@@ -337,97 +360,122 @@ export default function WeekendGapGuardWorkspace() {
 
   const page: Page = route === '/app/positions' ? 'positions' : route === '/app/risk' ? 'risk' : route === '/app/actions' ? 'actions' : route === '/app/monitoring' ? 'monitoring' : 'dashboard';
   const nav: Array<{ id: Page; label: string; hint: string }> = [
-    { id: 'dashboard', label: 'Overview', hint: 'Account health' },
+    { id: 'dashboard', label: 'Home', hint: 'Account overview' },
     { id: 'positions', label: 'Positions', hint: 'Kamino collateral' },
-    { id: 'risk', label: 'Guard', hint: 'Weekend stress' },
-    { id: 'actions', label: 'Actions', hint: 'Execute on Kamino' },
-    { id: 'monitoring', label: 'Monitoring', hint: 'Alerts & sync' },
+    { id: 'risk', label: 'Guard', hint: 'Weekend protection' },
+    { id: 'actions', label: 'Actions', hint: 'Kamino execution' },
+    { id: 'monitoring', label: 'Monitor', hint: 'Alerts & sync' },
   ];
   const routeFor = (id: Page) => id === 'dashboard' ? '/app' : '/app/' + id;
+  const pageTitle = nav.find((item) => item.id === page)?.label ?? 'Home';
 
   return (
     <div className="sp-dapp min-h-screen">
       <div className="min-h-screen lg:flex">
-        <aside className="hidden w-60 shrink-0 border-r border-sp-border bg-[#090e16] lg:flex lg:flex-col">
-          <div className="flex h-16 items-center gap-3 border-b border-sp-border px-5">
-            <div className="grid size-8 place-items-center bg-white text-[10px] font-bold text-[#070b12]">SP</div>
-            <div>
-              <div className="text-[11px] font-bold tracking-[.14em]">STOCKPASS</div>
-              <div className="mt-0.5 font-mono text-[8px] uppercase tracking-[.17em] text-slate-500">Weekend Gap Guard</div>
+        <aside className="sp-sidebar hidden w-[248px] shrink-0 lg:flex lg:flex-col">
+          <div className="sp-sidebar-brand flex h-[76px] items-center gap-3 px-5">
+            <div className="grid size-11 place-items-center rounded-2xl bg-[#101828] text-[11px] font-bold text-white">SP</div>
+            <div className="min-w-0">
+              <div className="text-[12px] font-bold tracking-[.14em] text-slate-100">STOCKPASS</div>
+              <div className="mt-1 truncate font-mono text-[8px] uppercase tracking-[.15em] text-slate-500">Weekend Gap Guard</div>
             </div>
           </div>
+
           <div className="flex-1 overflow-y-auto px-3 py-5">
-            <div className="px-3 pb-2 font-mono text-[8px] uppercase tracking-[.18em] text-slate-600">Workspace</div>
-            <nav className="space-y-1">
+            <div className="px-3 pb-2 text-[9px] font-semibold uppercase tracking-[.14em] text-slate-400">Workspace</div>
+            <nav className="space-y-1.5">
               {nav.map((item) => {
                 const active = page === item.id;
                 return (
-                  <button key={item.id} onClick={() => navigate(routeFor(item.id))} className={'group flex w-full items-center gap-3 border px-3 py-2.5 text-left transition-colors ' + (active ? 'border-sp-border-strong bg-sp-panel-2 text-white' : 'border-transparent text-slate-500 hover:border-sp-border hover:bg-sp-panel hover:text-slate-200')}>
-                    <span className={active ? 'text-sp-blue' : 'text-slate-600 group-hover:text-slate-400'}>{navIcon(item.id)}</span>
+                  <button
+                    key={item.id}
+                    onClick={() => navigate(routeFor(item.id))}
+                    className={'sp-nav-item group flex w-full items-center gap-3 px-3 py-3 text-left ' + (active ? 'sp-active' : '')}
+                  >
+                    <span className={active ? 'text-sp-blue' : 'text-slate-400'}>{navIcon(item.id)}</span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-[12px] font-medium">{item.label}</span>
-                      <span className="mt-0.5 block text-[9px] text-slate-600">{item.hint}</span>
+                      <span className="block text-[12px] font-semibold">{item.label}</span>
+                      <span className="mt-0.5 block text-[9px] text-slate-500">{item.hint}</span>
                     </span>
-                    {active && <span className="size-1 rounded-full bg-sp-blue" />}
+                    {active && <span className="size-1.5 rounded-full bg-sp-blue" />}
                   </button>
                 );
               })}
             </nav>
-            <div className="mt-7 border-t border-sp-border pt-5">
-              <div className="px-3 pb-2 font-mono text-[8px] uppercase tracking-[.18em] text-slate-600">System</div>
-              <div className="space-y-2 px-3 font-mono text-[9px] leading-5 text-slate-600">
-                <div className="flex items-center justify-between"><span>Network</span><span className="text-slate-400">MAINNET</span></div>
-                <div className="flex items-center justify-between"><span>Source</span><span className="text-slate-400">KAMINO</span></div>
-                <div className="flex items-center justify-between"><span>Market</span><span className="text-slate-400">XSTOCKS</span></div>
+
+            <div className="mt-8 rounded-2xl border border-sp-border bg-[#f8faff] p-4">
+              <div className="flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[.13em] text-slate-500">
+                <span className="size-2 rounded-full bg-emerald-500" /> Mainnet live
+              </div>
+              <div className="mt-4 space-y-2 text-[10px]">
+                <div className="flex justify-between"><span className="text-slate-500">Protocol</span><span className="font-semibold text-slate-200">Kamino</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Market</span><span className="font-semibold text-slate-200">xStocks</span></div>
               </div>
             </div>
           </div>
+
           <div className="border-t border-sp-border p-4">
-            <div className="flex items-center gap-3 border border-sp-border bg-sp-panel px-3 py-3">
-              <span className="flex size-2 rounded-full bg-emerald-400" />
+            <div className="sp-wallet-chip flex items-center gap-3 px-3 py-3">
+              <span className="grid size-8 place-items-center rounded-xl bg-[#eef3ff] text-sp-blue"><Wallet size={15} /></span>
               <div className="min-w-0 flex-1">
-                <div className="font-mono text-[8px] uppercase tracking-[.16em] text-slate-600">Connected wallet</div>
-                <div className="sp-num mt-1 truncate text-[10px] text-slate-300">{address}</div>
+                <div className="font-mono text-[8px] uppercase tracking-[.12em] text-slate-500">Connected wallet</div>
+                <div className="sp-num mt-1 truncate text-[9px] text-slate-200">{address}</div>
               </div>
             </div>
           </div>
         </aside>
 
         <div className="min-w-0 flex-1">
-          <header className="sticky top-0 z-30 border-b border-sp-border bg-[#070b12]/95 backdrop-blur lg:relative lg:bg-[#070b12]">
-            <div className="mx-auto flex h-16 max-w-[1500px] items-center justify-between gap-4 px-4 md:px-6 xl:px-8">
+          <header className="sp-topbar sticky top-0 z-30">
+            <div className="mx-auto flex h-[72px] max-w-[1240px] items-center justify-between gap-3 px-4 md:px-7">
               <div className="flex min-w-0 items-center gap-3">
-                <div className="grid size-8 shrink-0 place-items-center border border-sp-border bg-sp-panel text-[10px] font-bold lg:hidden">SP</div>
+                <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[#101828] text-[10px] font-bold text-white lg:hidden">SP</div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2 font-mono text-[8px] uppercase tracking-[.16em] text-slate-600"><span>StockPass</span><span>/</span><span>{nav.find((item) => item.id === page)?.label}</span></div>
-                  <div className="mt-1 truncate text-sm font-semibold text-slate-200">{nav.find((item) => item.id === page)?.hint}</div>
+                  <div className="hidden font-mono text-[8px] uppercase tracking-[.15em] text-slate-400 sm:block">StockPass</div>
+                  <div className="truncate text-[15px] font-bold tracking-[-.02em] text-slate-100">{pageTitle}</div>
                 </div>
               </div>
+
               <div className="flex items-center gap-2">
-                <div className="hidden items-center gap-2 border border-sp-border bg-sp-panel px-3 py-2 md:flex"><span className="size-1.5 rounded-full bg-emerald-400" /><span className="font-mono text-[9px] uppercase tracking-[.12em] text-slate-500">Solana mainnet</span></div>
-                <button onClick={() => void scan()} disabled={loading} className="sp-focus inline-flex size-9 items-center justify-center border border-sp-border bg-sp-panel text-slate-500 hover:text-white" aria-label="Refresh mainnet state"><RefreshCw size={15} className={loading ? 'animate-spin' : ''} /></button>
-                <div className="hidden max-w-44 items-center gap-2 border border-sp-border bg-sp-panel px-3 py-2 sm:flex"><Wallet size={14} className="text-sp-blue" /><span className="sp-num truncate text-[10px] text-slate-300">{address?.slice(0, 5)}…{address?.slice(-5)}</span></div>
+                <div className="sp-network-chip hidden items-center gap-2 px-3 py-2 text-[9px] font-semibold uppercase tracking-[.08em] md:flex">
+                  <span className="size-1.5 rounded-full bg-emerald-500" /> Solana mainnet
+                </div>
+                <button onClick={() => void scan()} disabled={loading} className="sp-refresh inline-flex size-10 items-center justify-center" aria-label="Refresh mainnet state">
+                  <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                </button>
+                <div className="sp-wallet-chip hidden items-center gap-2 px-3 py-2 sm:flex">
+                  <Wallet size={14} className="text-sp-blue" />
+                  <span className="sp-num max-w-32 truncate text-[9px] text-slate-300">{address?.slice(0, 5)}…{address?.slice(-5)}</span>
+                </div>
               </div>
             </div>
           </header>
 
-          <div className="mx-auto min-h-[calc(100vh-64px)] max-w-[1500px] px-4 pb-24 md:px-6 md:pb-10 xl:px-8">
+          <main className="mx-auto min-h-[calc(100vh-72px)] max-w-[1240px] px-4 pb-28 md:px-7 md:pb-10">
             {page === 'dashboard' && <WggDashboard address={address ?? null} positions={positions} rows={rows} counts={counts} loading={loading} preparing={preparing} authenticating={authenticating} signing={signing} prepared={prepared} signature={signature} error={error} lastLoaded={lastLoaded} scan={scan} prepareFix={prepareFix} signAndSendPrepared={signAndSendPrepared} />}
             {page === 'positions' && <WggPositionsPage positions={positions} rows={rows} loading={loading} lastLoaded={lastLoaded} scan={scan} />}
             {page === 'risk' && <WggRiskPage rows={rows} counts={counts} prepareFix={prepareFix} preparing={preparing} authenticating={authenticating} />}
             {page === 'actions' && <WggActionsPage address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
             {page === 'monitoring' && <WggMonitoringPage address={address ?? ''} />}
 
-            <footer className="mt-10 border-t border-sp-border pt-5 md:flex md:items-center md:justify-between">
-              <div className="font-mono text-[8px] uppercase tracking-[.14em] text-slate-600">StockPass · Weekend Gap Guard</div>
-              <div className="mt-2 flex items-center gap-4 font-mono text-[8px] uppercase tracking-[.12em] text-slate-600 md:mt-0"><span className="inline-flex items-center gap-1.5"><CircleHelp size={11} /> No demo balances</span><span className="inline-flex items-center gap-1.5"><ShieldCheck size={11} /> Wallet-signed actions</span></div>
+            <footer className="mt-10 flex flex-col gap-2 border-t border-sp-border py-6 text-[9px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
+              <div className="font-mono uppercase tracking-[.12em]">StockPass · Weekend Gap Guard</div>
+              <div className="flex items-center gap-4 font-mono uppercase tracking-[.1em]">
+                <span className="inline-flex items-center gap-1.5"><CircleHelp size={11} /> No demo balances</span>
+                <span className="inline-flex items-center gap-1.5"><ShieldCheck size={11} /> Wallet signed</span>
+              </div>
             </footer>
-          </div>
+          </main>
 
-          <nav className="fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 gap-1 border border-sp-border bg-[#0a1018] p-1 shadow-2xl lg:hidden">
+          <nav className="sp-bottom-nav fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 lg:hidden">
             {nav.map((item) => {
               const active = page === item.id;
-              return <button key={item.id} onClick={() => navigate(routeFor(item.id))} className={'flex min-h-12 flex-col items-center justify-center gap-1 text-[9px] ' + (active ? 'bg-white text-slate-950' : 'text-slate-500')}>{navIcon(item.id)}<span>{item.label}</span></button>;
+              return (
+                <button key={item.id} onClick={() => navigate(routeFor(item.id))} className={'sp-bottom-item flex flex-col items-center justify-center gap-1 text-[9px] font-semibold ' + (active ? 'sp-active' : '')}>
+                  {navIcon(item.id)}
+                  <span>{item.label}</span>
+                </button>
+              );
             })}
           </nav>
         </div>
