@@ -557,7 +557,7 @@ async function loadWallets() {
   return [...wallets].filter(Boolean).slice(0, MAX_WALLETS_PER_RUN);
 }
 
-export const config = { maxDuration: 60 };
+export const config = { runtime: 'nodejs', maxDuration: 60 };
 
 export default async function handler(req: any, res: any) {
   const method = String(req.method || 'GET');
