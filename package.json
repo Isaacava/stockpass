@@ -32,5 +32,11 @@
     "typescript": "^5.9.2",
     "vite": "^7.1.3",
     "vite-plugin-wasm": "^3.5.0"
+  },
+  "engines": {
+    "node": "22.x"
+  },
+  "overrides": {
+    "rpc-websockets": "10.0.0"
   }
 }
