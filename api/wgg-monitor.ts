@@ -481,6 +481,69 @@ async function dispatchAlerts() {
   }
 }
 
+async function loadMonitoringState(wallet: string) {
+  if (!supabase) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');
+
+  const [runsResult, positionsResult, alertsResult, telegramResult] = await Promise.all([
+    supabase
+      .from('wgg_check_runs')
+      .select('id,run_kind,started_at,finished_at,status,positions_scanned,positions_flagged,error_message,metadata')
+      .contains('metadata', { wallet })
+      .order('started_at', { ascending: false })
+      .limit(10),
+    supabase
+      .from('wgg_monitored_positions')
+      .select('id,symbol,obligation_address,collateral_mint,risk_status,collateral_value_usd,debt_usd,current_buffer_pct,typical_weekend_gap_pct,last_checked_at,updated_at')
+      .eq('wallet', wallet)
+      .order('updated_at', { ascending: false })
+      .limit(25),
+    supabase
+      .from('wgg_alerts')
+      .select('id,severity,title,message,details,created_at,acknowledged_at,telegram_sent_at')
+      .eq('wallet', wallet)
+      .order('created_at', { ascending: false })
+      .limit(25),
+    supabase
+      .from('wgg_telegram_links')
+      .select('wallet,linked_at,updated_at')
+      .eq('wallet', wallet)
+      .maybeSingle(),
+  ]);
+
+  if (runsResult.error) throw runsResult.error;
+  if (positionsResult.error) throw positionsResult.error;
+  if (alertsResult.error) throw alertsResult.error;
+  if (telegramResult.error) throw telegramResult.error;
+
+  const latestPositionCheck = (positionsResult.data ?? [])
+    .map((row) => row.last_checked_at)
+    .filter(Boolean)
+    .sort()
+    .at(-1) ?? null;
+  const latestCompletedRun = (runsResult.data ?? []).find((run) => run.status === 'completed');
+
+  return {
+    wallet,
+    lastCheckedAt: latestCompletedRun?.finished_at ?? latestPositionCheck,
+    lastRun: runsResult.data?.[0] ?? null,
+    runs: runsResult.data ?? [],
+    positions: positionsResult.data ?? [],
+    alerts: (alertsResult.data ?? []).map((alert) => ({
+      id: alert.id,
+      severity: alert.severity,
+      title: alert.title,
+      message: alert.message,
+      symbol: typeof alert.details === 'object' && alert.details
+        ? String((alert.details as { symbol?: unknown }).symbol ?? '')
+        : '',
+      createdAt: alert.created_at,
+      acknowledgedAt: alert.acknowledged_at,
+      telegramSentAt: alert.telegram_sent_at,
+    })),
+    telegramLinked: Boolean(telegramResult.data),
+  };
+}
+
 async function loadWallets() {
   if (!supabase) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');
   const [monitored, actions] = await Promise.all([
@@ -502,6 +565,12 @@ export default async function handler(req: any, res: any) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});
     const wallet = typeof body.wallet === 'string' ? body.wallet.trim() : '';
     const mode = body.mode === 'sync' ? 'sync' : 'cron';
+
+    if (mode === 'state') {
+      if (method !== 'POST' || !wallet) return json(res, { error: 'POST with wallet is required for monitoring state.' }, 400);
+      if (!await validateWalletSession(req, wallet)) return json(res, { error: 'A valid wallet session is required.' }, 401);
+      return json(res, { ok: true, state: await loadMonitoringState(wallet) });
+    }
 
     if (mode === 'sync') {
       if (method !== 'POST' || !wallet) return json(res, { error: 'POST with wallet is required for manual sync.' }, 400);
