@@ -203,7 +203,7 @@ export default function KaminoActionConsole({
     setSigning(true); setError(''); setVerified('');
     try {
       const rpcUrl = SOLANA_MAINNET_RPC;
-      if (!rpcUrl) throw new Error('VITE_SOLANA_RPC_URL is not configured.');
+      if (!rpcUrl) throw new Error('The Solana mainnet RPC proxy is not configured.');
       const connection = new Connection(rpcUrl, 'confirmed');
       const latest = await connection.getLatestBlockhash('confirmed');
       const instructions = prepared.instructions.map((ix) => new TransactionInstruction({
