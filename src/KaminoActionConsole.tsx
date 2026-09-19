@@ -20,9 +20,10 @@ type PreparedAction = {
   instructions: Array<{ programAddress: string; data: string; accounts: Array<{ address: string; signer: boolean; writable: boolean }> }>;
   lookupTables: string[];
 };
-type ActionType = 'borrow' | 'supply' | 'deposit' | 'repay' | 'withdraw' | 'close';
+type ActionType = 'create' | 'borrow' | 'supply' | 'deposit' | 'repay' | 'withdraw' | 'close';
 
 const actionMeta: Record<ActionType, { label: string; description: string; icon: typeof Plus }> = {
+  create: { label: 'Create position', description: 'Open a new Kamino obligation with xStock collateral.', icon: CircleDollarSign },
   borrow: { label: 'Borrow', description: 'Borrow against an existing Kamino obligation.', icon: ArrowUpFromLine },
   supply: { label: 'Supply', description: 'Deposit an asset into a Kamino reserve.', icon: ArrowDownToLine },
   deposit: { label: 'Add collateral', description: 'Increase xStock collateral on an obligation.', icon: Plus },
@@ -70,7 +71,7 @@ export default function KaminoActionConsole({
   positions: KaminoXStockPosition[];
   onCompleted: () => Promise<void> | void;
 }) {
-  const [action, setAction] = useState<ActionType>(positions.length ? 'deposit' : 'supply');
+  const [action, setAction] = useState<ActionType>(positions.length ? 'deposit' : 'create');
   const [reserves, setReserves] = useState<ReserveOption[]>([]);
   const [obligation, setObligation] = useState(positions[0]?.obligation ?? '');
   const [reserveAddress, setReserveAddress] = useState('');
@@ -89,6 +90,7 @@ export default function KaminoActionConsole({
   const collateralOptions = position?.xStocks ?? [];
   const debtOptions = position?.debts ?? [];
   const marketReserve = reserves.find((item) => item.address === reserveAddress);
+  const xStockReserves = useMemo(() => reserves.filter((item) => /x$/i.test(item.symbol)), [reserves]);
   const collateral = collateralOptions.find((item) => item.reserve === collateralReserve) ?? collateralOptions[0];
   const debt = debtOptions.find((item) => item.reserve === repayReserve) ?? debtOptions[0];
 
@@ -104,13 +106,16 @@ export default function KaminoActionConsole({
       .then((body) => {
         const next = Array.isArray(body?.reserves) ? body.reserves : [];
         setReserves(next);
-        if (!reserveAddress && next[0]) setReserveAddress(next[0].address);
+        if (!reserveAddress) setReserveAddress(next.find((item: ReserveOption) => /x$/i.test(item.symbol))?.address ?? next[0]?.address ?? '');
       })
       .catch((cause) => setError(cause instanceof Error ? cause.message : 'Kamino markets unavailable.'))
       .finally(() => setLoadingMarkets(false));
   }, [address]);
 
   useEffect(() => {
+    if (action === 'create' && xStockReserves.length && !xStockReserves.some((item) => item.address === reserveAddress)) {
+      setReserveAddress(xStockReserves[0].address);
+    }
     if (action === 'deposit' || action === 'withdraw') {
       const item = collateralOptions.find((candidate) => candidate.reserve === collateralReserve) ?? collateralOptions[0];
       if (item) {
@@ -133,7 +138,7 @@ export default function KaminoActionConsole({
       if (!amount) setAmount(String(debtOptions[0].amount));
       if (!withdrawAmount) setWithdrawAmount(String(collateralOptions[0].amount));
     }
-  }, [action, collateralOptions, debtOptions, collateralReserve, repayReserve, amount, withdrawAmount]);
+  }, [action, collateralOptions, debtOptions, collateralReserve, repayReserve, amount, withdrawAmount, reserveAddress, xStockReserves]);
 
   function choose(next: ActionType) {
     setAction(next);
@@ -155,7 +160,11 @@ export default function KaminoActionConsole({
       let baseUnits = '';
       let withdrawBaseUnits: string | undefined;
 
-      if (action === 'borrow' || action === 'supply') {
+      if (action === 'create') {
+        if (!marketReserve || !/x$/i.test(marketReserve.symbol)) throw new Error('Select a supported xStock reserve first.');
+        baseUnits = toBaseUnits(amount, marketReserve.decimals);
+        targetReserve = marketReserve.address;
+      } else if (action === 'borrow' || action === 'supply') {
         if (!marketReserve) throw new Error('Select a Kamino reserve first.');
         if (action === 'borrow' && !position) throw new Error('Borrow requires an existing Kamino obligation.');
         baseUnits = toBaseUnits(amount, marketReserve.decimals);
@@ -180,9 +189,10 @@ export default function KaminoActionConsole({
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-client-info': token ? 'stockpass stockpass-session=' + token : 'stockpass' },
         body: JSON.stringify({
-          action,
+          action: action === 'create' ? 'deposit' : action,
+          createPosition: action === 'create',
           wallet: address,
-          obligationAddress: action === 'supply' ? undefined : position?.obligation,
+          obligationAddress: action === 'supply' || action === 'create' ? undefined : position?.obligation,
           reserveAddress: targetReserve,
           withdrawReserveAddress: action === 'close' ? collateral?.reserve : undefined,
           amountBaseUnits: baseUnits,
@@ -239,7 +249,7 @@ export default function KaminoActionConsole({
     }
   }
 
-  const availableActions = (Object.keys(actionMeta) as ActionType[]).filter((item) => item === 'supply' || positions.length > 0);
+  const availableActions = (Object.keys(actionMeta) as ActionType[]).filter((item) => item === 'create' || item === 'supply' || positions.length > 0);
   const current = actionMeta[action];
   const quickFillBase = action === 'repay' ? debt?.amount : action === 'withdraw' ? collateral?.amount : action === 'close' ? debt?.amount : undefined;
   const quickFillDecimals = action === 'repay' || action === 'close' ? (debt?.mintDecimals ?? 6) : (collateral?.mintDecimals ?? 6);
@@ -277,21 +287,28 @@ export default function KaminoActionConsole({
         </div>
 
         <div className="p-4">
-          {action !== 'supply' && action !== 'borrow' && !positions.length ? (
+          {action !== 'create' && action !== 'supply' && action !== 'borrow' && !positions.length ? (
             <div className="sp-empty-block py-8">
               <ShieldCheck size={20} />
               <div className="sp-empty-title">No Kamino obligation loaded</div>
-              <div className="sp-empty-copy">This action needs real position state. Supply remains available without an existing obligation.</div>
+              <div className="sp-empty-copy">Choose Create position to open a new Kamino obligation from xStock collateral, or Supply to deposit liquidity into a Kamino reserve.</div>
             </div>
           ) : (
             <>
-              {(action === 'borrow' || action === 'supply') && (
-                <Field label="Kamino reserve">
+              {(action === 'create' || action === 'borrow' || action === 'supply') && (
+                <Field label={action === 'create' ? 'xStock collateral' : 'Kamino reserve'}>
                   <select value={reserveAddress} onChange={(e) => setReserveAddress(e.target.value)} className="sp-input">
-                    <option value="">{loadingMarkets ? 'Loading mainnet reserves…' : 'Select reserve'}</option>
-                    {reserves.map((item) => <option key={item.address} value={item.address}>{item.symbol} · {item.decimals} decimals</option>)}
+                    <option value="">{loadingMarkets ? 'Loading mainnet reserves…' : action === 'create' ? 'Select xStock collateral' : 'Select reserve'}</option>
+                    {(action === 'create' ? xStockReserves : reserves).map((item) => <option key={item.address} value={item.address}>{item.symbol} · {item.decimals} decimals</option>)}
                   </select>
                 </Field>
+              )}
+
+              {action === 'create' && (
+                <div className="mt-3 rounded-xl border border-brand/20 bg-brand-soft px-3 py-3">
+                  <div className="text-[12px] font-bold text-ink">New Kamino obligation</div>
+                  <div className="sp-caption mt-1">Your first xStock deposit creates the obligation on mainnet. After confirmation, StockPass can discover it and the same workspace can be used to borrow, add collateral, repay or withdraw.</div>
+                </div>
               )}
 
               {action !== 'supply' && action !== 'borrow' && (
@@ -322,7 +339,7 @@ export default function KaminoActionConsole({
                 label={action === 'close' ? 'Debt repayment amount' : 'Amount'}
                 value={amount}
                 setValue={setAmount}
-                suffix={action === 'borrow' || action === 'supply' ? (marketReserve?.symbol ?? 'TOKEN') : action === 'repay' || action === 'close' ? (debt?.mint ?? 'DEBT') : (collateral?.symbol ?? 'xStock')}
+                suffix={action === 'create' || action === 'borrow' || action === 'supply' ? (marketReserve?.symbol ?? (action === 'create' ? 'xStock' : 'TOKEN')) : action === 'repay' || action === 'close' ? (debt?.mint ?? 'DEBT') : (collateral?.symbol ?? 'xStock')}
                 base={quickFillBase}
                 quickFillUnit={quickFillUnit}
                 applyQuickFill={applyQuickFill}
@@ -360,7 +377,7 @@ export default function KaminoActionConsole({
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Preview label="Network" value="Solana mainnet" />
             <Preview label="Protocol" value="Kamino" />
-            <Preview label="Position" value={position ? position.obligation.slice(0, 5) + '…' + position.obligation.slice(-5) : '—'} />
+            <Preview label="Position" value={position ? position.obligation.slice(0, 5) + '…' + position.obligation.slice(-5) : action === 'create' ? 'New obligation' : '—'} />
             <Preview label="Custody" value="None" />
           </div>
         </div>
