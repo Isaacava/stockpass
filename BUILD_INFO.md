@@ -514,7 +514,7 @@ Supabase hosts:
 - unsigned instruction serialization
 - browser transaction reconstruction
 - Reown wallet signing bridge
-- transaction submission and confirmation UI
+- transaction submission and confirmation UI\n- GitHub Actions build regression check for TypeScript + WASM
 - WGG-only TypeScript build graph
 - removal of unused WGG V2 / duplicate Kamino protection modules
 - WASM-aware Vite build configuration
@@ -528,7 +528,7 @@ As of 2026-09-19, the live WGG code path has been cleaned up and the protection 
 
 The `main` branch no longer includes the unreferenced `WeekendGapGuardWorkspaceV2.tsx`, `kaminoProtection.ts`, `wggKamino.ts`, or `WalletAuthGate.tsx` files. TypeScript now targets the live WGG source graph so legacy StockPass UI code cannot block the WGG build.
 
-The latest Vercel deployment is still processing, so the WGG build is **not yet marked READY**. The next verification gate is a successful Vercel build followed by one real wallet-authenticated protection-prepare pass.
+The WGG build is now **verified** at the compiler/bundle level. GitHub Actions passed both `tsc --noEmit --pretty false` and the WASM production build, and Vercel reports the corrected deployment as READY. The live deployment root also returns HTTP 200.\n\nThe remaining verification gate is runtime behavior: configure the required production Pyth secret, exercise one real wallet-authenticated protection-prepare flow against a real eligible position, and confirm wallet signing/submission only after review.
 
 ### In progress
 
