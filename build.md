@@ -316,6 +316,7 @@ File:
 
 The current control surface provides:
 
+- Create position — first xStock collateral deposit creates a new Kamino obligation
 - Borrow
 - Lend / Supply
 - Add collateral
@@ -326,7 +327,7 @@ The current control surface provides:
 The implementation uses the current Kamino SDK action builders:
 
 - `buildDepositReserveLiquidityTxns()` for pure liquidity supply
-- `buildDepositTxns()` for collateral
+- `buildDepositTxns()` for collateral and first-position creation via `VanillaObligation`
 - `buildBorrowTxns()` for borrow
 - `buildRepayTxns()` for repay
 - `buildWithdrawTxns()` for collateral withdrawal
@@ -1107,3 +1108,12 @@ Touched:
 No demo balances, fabricated risk values, fake alerts, timeout-based confirmations, or simulated wallet signing were introduced.
 
 Verification gate: source-level review completed. Local production build cannot currently be executed from this runtime because the repository checkout cannot be fetched due to GitHub DNS resolution failure. Latest GitHub/Vercel CI status must be checked before claiming deployment readiness.
+
+
+## Runtime fix + first-position creation — 2026-09-19
+
+The live runtime review identified a bundled Kamino dependency gap: `@solana-program/memo` was left as a bare module specifier in the production bundle. StockPass now declares the maintained Memo client directly so Vite/Vercel can resolve it for both browser and serverless bundles.
+
+The Actions screen now includes **Create position** for wallets with no existing Kamino obligation. It prepares a real Kamino `buildDepositTxns()` flow with `VanillaObligation`, allowing the first xStock collateral deposit to create the obligation on mainnet. The server only skips obligation lookup for this explicitly marked first-position flow; wallet signing, confirmation, and exact prepared-instruction verification remain unchanged.
+
+No synthetic position is created in the UI. The new obligation appears only after the signed mainnet transaction is confirmed and the subsequent Kamino rescan discovers it.
