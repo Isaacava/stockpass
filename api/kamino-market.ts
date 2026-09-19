@@ -1,11 +1,13 @@
-
 const MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
+
+export const config = { runtime: 'nodejs', maxDuration: 30 };
 
 function json(res: any, body: unknown, status = 200) {
   res.status(status).setHeader('Cache-Control', 'public, max-age=30, s-maxage=30').json(body);
 }
 
 export default async function handler(req: any, res: any) {
+  if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return json(res, { error: 'GET required' }, 405);
 
   const rpcUrl = process.env.SOLANA_RPC_URL || '';
