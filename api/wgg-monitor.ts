@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { discoverKaminoXStockPositions, KAMINO_MAIN_MARKET } from '../src/lib/kamino';
+import { KAMINO_MAIN_MARKET } from '../src/lib/kamino';
 import { evaluateEarningsRisk, type EarningsEvent } from '../src/lib/wggEarnings';
 import {
   calculateCollateralUsdForTargetLtv,
@@ -390,6 +390,7 @@ async function syncWallet(wallet: string, runKind: 'manual' | 'friday' | 'positi
   if (runError) throw runError;
 
   try {
+    const { discoverKaminoXStockPositions } = await import('../src/lib/kamino');
     const positions = await discoverKaminoXStockPositions(wallet, SOLANA_RPC_URL);
     const symbols = Array.from(new Set(positions.flatMap((position) => position.xStocks.map((stock) => stock.symbol))));
     const priceData = await fetchXStockData(symbols);
@@ -564,7 +565,7 @@ export default async function handler(req: any, res: any) {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});
     const wallet = typeof body.wallet === 'string' ? body.wallet.trim() : '';
-    const mode = body.mode === 'sync' ? 'sync' : 'cron';
+    const mode = body.mode === 'state' || body.mode === 'sync' ? body.mode : 'cron';
 
     if (mode === 'state') {
       if (method !== 'POST' || !wallet) return json(res, { error: 'POST with wallet is required for monitoring state.' }, 400);
