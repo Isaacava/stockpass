@@ -6,9 +6,15 @@ import {
   getMedianSlotDurationInMsFromLastEpochs,
 } from '@kamino-finance/klend-sdk';
 
-const SUPABASE_URL = 'https://sfbxpscbevnmoppgkjcr.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_eCgd2QEH5mUlEK5vHIonyw_v0E8QFrp';
-const MAINNET_RPC = 'https://api.mainnet-beta.solana.com';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY =
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  'sb_publishable_eCgd2QEH5mUlEK5vHIonyw_v0E8QFrp';
+const MAINNET_RPC =
+  process.env.SOLANA_RPC_URL ||
+  process.env.VITE_SOLANA_RPC_URL ||
+  'https://api.mainnet-beta.solana.com';
 const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 
 type PreparedInstruction = {
