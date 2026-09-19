@@ -66,15 +66,19 @@ export default async function handler(req: any, res: any) {
     const obligationAddress = typeof body.obligationAddress === 'string' ? body.obligationAddress.trim() : '';
     const reserveAddress = typeof body.reserveAddress === 'string' ? body.reserveAddress.trim() : '';
     const amountBaseUnits = typeof body.amountBaseUnits === 'string' ? body.amountBaseUnits : '';
+    const targetLtvPct = typeof body.targetLtvPct === 'number' ? body.targetLtvPct : Number(body.targetLtvPct);
     const kind = body.kind === 'repay' || body.kind === 'deposit' ? body.kind : '';
 
     if (!validAddress(wallet) || !validAddress(obligationAddress) || !validAddress(reserveAddress)) {
       return json(res, { error: 'Invalid Solana address in protection request.' }, 400);
     }
-    if (!/^\d+$/.test(amountBaseUnits)) {
-      return json(res, { error: 'amountBaseUnits must be an unsigned integer string.' }, 400);
-    }
     if (!kind) return json(res, { error: 'kind must be repay or deposit.' }, 400);
+    if (kind === 'deposit' && !/^\d+$/.test(amountBaseUnits)) {
+      return json(res, { error: 'amountBaseUnits must be an unsigned integer string for deposits.' }, 400);
+    }
+    if (kind === 'repay' && (!Number.isFinite(targetLtvPct) || targetLtvPct <= 0 || targetLtvPct >= 100)) {
+      return json(res, { error: 'A valid targetLtvPct between 0 and 100 is required for repay.' }, 400);
+    }
 
     const clientInfoHeader = req.headers['x-client-info'];
     const clientInfo = Array.isArray(clientInfoHeader)
@@ -128,11 +132,52 @@ export default async function handler(req: any, res: any) {
     const obligation = await market.getObligationByAddress(address(obligationAddress));
     if (!obligation) throw new Error('The Kamino obligation no longer exists. Refresh before preparing protection.');
 
+    let preparedAmountBaseUnits = amountBaseUnits;
+    let repayUsd = 0;
+    if (kind === 'repay') {
+      const reserve = market.getExistingReserveByAddress(address(reserveAddress));
+      if (!reserve) return json(res, { error: 'The selected debt reserve is no longer present in Kamino.' }, 400);
+
+      const debt = (obligation.borrows ?? []).find(
+        (borrow: any) => String(borrow.reserveAddress ?? '') === reserveAddress,
+      );
+      if (!debt) return json(res, { error: 'The selected reserve is not currently borrowed by this obligation.' }, 400);
+
+      const collateralUsd = Number(obligation.refreshedStats?.userTotalDeposit?.toNumber?.() ?? 0);
+      const borrowUsd = Number(obligation.refreshedStats?.userTotalBorrow?.toNumber?.() ?? 0);
+      if (!Number.isFinite(collateralUsd) || collateralUsd <= 0 || !Number.isFinite(borrowUsd) || borrowUsd <= 0) {
+        return json(res, { error: 'Kamino did not return usable current collateral/debt values. Refresh and try again.' }, 400);
+      }
+
+      repayUsd = Math.max(0, borrowUsd - collateralUsd * (targetLtvPct / 100));
+      const oraclePrice = Number(reserve.getOracleMarketPrice().toString());
+      const mintDecimals = Number(reserve.getMintDecimals());
+      if (!Number.isFinite(oraclePrice) || oraclePrice <= 0 || !Number.isFinite(mintDecimals) || mintDecimals < 0 || mintDecimals > 18) {
+        return json(res, { error: 'The selected debt reserve has no usable live oracle price/decimals.' }, 400);
+      }
+
+      const currentDebtAmount = Number(
+        String((debt as any).amount ?? (debt as any).scaledAmount ?? 0),
+      );
+      if (repayUsd <= 0) {
+        return json(res, { error: 'Current state is already at or below the requested target LTV.' }, 400);
+      }
+
+      const estimatedTokens = repayUsd / oraclePrice;
+      const estimatedBaseUnits = Math.ceil(estimatedTokens * 10 ** mintDecimals);
+      const currentBaseUnits = Math.floor(currentDebtAmount * 10 ** mintDecimals);
+      if (!Number.isFinite(estimatedBaseUnits) || estimatedBaseUnits <= 0) {
+        return json(res, { error: 'Calculated repay amount is not usable.' }, 400);
+      }
+      const cappedBaseUnits = Math.min(estimatedBaseUnits, Math.max(1, currentBaseUnits));
+      preparedAmountBaseUnits = String(cappedBaseUnits);
+    }
+
     const owner = createNoopSigner(address(wallet));
     const action = kind === 'repay'
       ? await KaminoAction.buildRepayTxns({
           kaminoMarket: market,
-          amount: amountBaseUnits,
+          amount: preparedAmountBaseUnits,
           reserveAddress: address(reserveAddress),
           owner,
           obligation,
@@ -160,7 +205,9 @@ export default async function handler(req: any, res: any) {
       wallet,
       obligationAddress,
       reserveAddress,
-      amountBaseUnits,
+      amountBaseUnits: preparedAmountBaseUnits,
+      repayUsd: kind === 'repay' ? repayUsd : undefined,
+      targetLtvPct: kind === 'repay' ? targetLtvPct : undefined,
       instructions,
       lookupTables: action.luts.map(String),
     });
