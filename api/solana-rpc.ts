@@ -1,4 +1,4 @@
-export const config = { runtime: 'nodejs20.x' };
+export const config = { runtime: 'nodejs' };
 
 function json(res: any, body: unknown, status = 200) {
   res.status(status).setHeader('Cache-Control', 'no-store').json(body);
