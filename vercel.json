@@ -3,6 +3,18 @@
   "functions": {
     "api/wgg-protection-prepare.ts": {
       "maxDuration": 60
+    },
+    "api/wgg-monitor.ts": {
+      "maxDuration": 60
+    },
+    "api/wgg-telegram-link.ts": {
+      "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/wgg-monitor",
+      "schedule": "0 21 * * 5"
+    }
+  ]
 }
