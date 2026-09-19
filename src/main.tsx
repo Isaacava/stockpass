@@ -30,13 +30,13 @@ function LandingGate({ onConnect, status, error }: { onConnect: () => void; stat
         <h1>Protect the position<br /><em>before Monday.</em></h1>
         <p>Connect your Solana wallet to read real Kamino xStock collateral, measure weekend-gap exposure, and unlock the protected workspace.</p>
         <button className="wgg-gate-connect" onClick={onConnect} disabled={status === 'starting'}>{status === 'starting' ? 'Starting wallet connector…' : 'Connect Solana wallet →'}</button>
-        <div className="wgg-gate-proof"><span>Wallet ownership</span><b>signed challenge</b><span>Position state</span><b>Kamino mainnet</b><span>Market context</span><b>xStocks</b></div>
+        <div className="wgg-gate-proof"><span>POSITION TRUTH</span><b>KAMINO</b><span>MARKET CONTEXT</span><b>XSTOCKS</b><span>SCENARIO</span><b>WEEKEND GAP</b><span>ACTION</span><b>WALLET SIGNATURE</b></div>
         {error && <div className="wgg-gate-error">{error}</div>}
       </section>
       <aside className="wgg-gate-card">
         <div className="wgg-gate-card-top"><span>WGG / 01</span><span><i /> ONLINE</span></div>
         <div className="wgg-gate-orbit"><div /><span /><span /><span /></div>
-        <div className="wgg-gate-card-lines"><div><span>COLLATERAL</span><strong>KAMINO</strong></div><div><span>PRICE</span><strong>XSTOCKS</strong></div><div><span>RISK MODEL</span><strong>WEEKEND GAP</strong></div></div>
+        <div className="wgg-gate-card-lines"><div><span>1 / POSITION</span><strong>KAMINO STATE</strong></div><div><span>2 / STRESS</span><strong>STRESSED LTV</strong></div><div><span>3 / CONTROL</span><strong>WALLET APPROVAL</strong></div></div>
       </aside>
     </main>
   </div>;
