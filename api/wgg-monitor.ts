@@ -390,11 +390,7 @@ async function syncWallet(wallet: string, runKind: 'manual' | 'friday' | 'positi
   if (runError) throw runError;
 
   try {
-    const [positions, marketData] = await Promise.all([
-      discoverKaminoXStockPositions(wallet, SOLANA_RPC_URL),
-      Promise.resolve(null),
-    ]);
-
+    const positions = await discoverKaminoXStockPositions(wallet, SOLANA_RPC_URL);
     const symbols = Array.from(new Set(positions.flatMap((position) => position.xStocks.map((stock) => stock.symbol))));
     const priceData = await fetchXStockData(symbols);
     const underlyingSymbols = Array.from(new Set(symbols.map(underlying)));
@@ -454,7 +450,6 @@ async function syncWallet(wallet: string, runKind: 'manual' | 'friday' | 'positi
         historicalProvider: TWELVE_DATA_API_KEY ? 'Twelve Data' : null,
         currentPriceProvider: 'xStocks',
         alertsCreated: alertIds.length,
-        marketDataUsed: Boolean(marketData),
       },
     }).eq('id', run.id);
 
