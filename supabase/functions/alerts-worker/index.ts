@@ -1,1 +1,89 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';\n\nconst SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;\nconst SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;\nconst TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') || '';\n\nconst supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {\n  auth: { persistSession: false }\n});\n\nfunction json(body: unknown, status = 200) {\n  return new Response(JSON.stringify(body), {\n    status,\n    headers: { 'content-type': 'application/json' }\n  });\n}\n\nasync function authorize(req: Request) {\n  const expected = 'Bearer ' + SERVICE_ROLE_KEY;\n  return SERVICE_ROLE_KEY && req.headers.get('authorization') === expected;\n}\n\nasync function sendTelegram(chatId: string, text: string) {\n  if (!TELEGRAM_BOT_TOKEN) return false;\n  const response = await fetch('https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage', {\n    method: 'POST',\n    headers: { 'content-type': 'application/json' },\n    body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true })\n  });\n  return response.ok;\n}\n\nDeno.serve(async (req) => {\n  if (req.method !== 'POST') return json({ error: 'POST required' }, 405);\n  if (!(await authorize(req))) return json({ error: 'unauthorized' }, 401);\n\n  const { data: alerts, error } = await supabase\n    .from('wgg_alerts')\n    .select('id,wallet,position_id,severity,title,message,details,telegram_sent_at')\n    .is('telegram_sent_at', null)\n    .order('created_at', { ascending: true })\n    .limit(50);\n\n  if (error) return json({ error: error.message }, 500);\n\n  let sent = 0;\n  let skipped = 0;\n\n  for (const alert of alerts ?? []) {\n    const { data: link } = await supabase\n      .from('wgg_telegram_links')\n      .select('telegram_chat_id')\n      .eq('wallet', alert.wallet)\n      .maybeSingle();\n\n    if (!link?.telegram_chat_id) {\n      skipped += 1;\n      continue;\n    }\n\n    const details = alert.details && typeof alert.details === 'object' ? alert.details as Record<string, unknown> : {};\n    const symbol = String(details.symbol || 'xStock');\n    const gap = details.typicalWeekendGapPct == null ? '—' : Number(details.typicalWeekendGapPct).toFixed(2) + '%';\n    const buffer = details.currentBufferPct == null ? '—' : Number(details.currentBufferPct).toFixed(2) + ' pts';\n    const adjusted = details.adjustedGapPct == null ? '—' : Number(details.adjustedGapPct).toFixed(2) + '%';\n    const text = 'Weekend Gap Guard\\n\\n' +\n      alert.title + '\\n' +\n      alert.message + '\\n\\n' +\n      'Symbol: ' + symbol + '\\n' +\n      'Weekend gap (P75 downside): ' + gap + '\\n' +\n      'Adjusted gap signal: ' + adjusted + '\\n' +\n      'Current liquidation buffer: ' + buffer + '\\n\\n' +\n      'This is a risk-monitoring alert. Any Kamino action still requires your wallet signature.';\n\n    try {\n      const delivered = await sendTelegram(String(link.telegram_chat_id), text);\n      if (delivered) {\n        await supabase.from('wgg_alerts').update({ telegram_sent_at: new Date().toISOString() }).eq('id', alert.id);\n        sent += 1;\n      } else {\n        skipped += 1;\n      }\n    } catch {\n      skipped += 1;\n    }\n  }\n\n  return json({ processed: (alerts ?? []).length, sent, skipped, botConfigured: Boolean(TELEGRAM_BOT_TOKEN) });\n});
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN') || '';
+
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  auth: { persistSession: false }
+});
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' }
+  });
+}
+
+async function authorize(req: Request) {
+  const expected = 'Bearer ' + SERVICE_ROLE_KEY;
+  return Boolean(SERVICE_ROLE_KEY) && req.headers.get('authorization') === expected;
+}
+
+async function sendTelegram(chatId: string, text: string) {
+  if (!TELEGRAM_BOT_TOKEN) return false;
+  const response = await fetch('https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ chat_id: chatId, text, disable_web_page_preview: true })
+  });
+  return response.ok;
+}
+
+Deno.serve(async (req) => {
+  if (req.method !== 'POST') return json({ error: 'POST required' }, 405);
+  if (!(await authorize(req))) return json({ error: 'unauthorized' }, 401);
+
+  const { data: alerts, error } = await supabase
+    .from('wgg_alerts')
+    .select('id,wallet,position_id,severity,title,message,details,telegram_sent_at')
+    .is('telegram_sent_at', null)
+    .order('created_at', { ascending: true })
+    .limit(50);
+
+  if (error) return json({ error: error.message }, 500);
+
+  let sent = 0;
+  let skipped = 0;
+
+  for (const alert of alerts ?? []) {
+    const { data: link } = await supabase
+      .from('wgg_telegram_links')
+      .select('telegram_chat_id')
+      .eq('wallet', alert.wallet)
+      .maybeSingle();
+
+    if (!link?.telegram_chat_id) {
+      skipped += 1;
+      continue;
+    }
+
+    const details = alert.details && typeof alert.details === 'object' ? alert.details as Record<string, unknown> : {};
+    const symbol = String(details.symbol || 'xStock');
+    const gap = details.typicalWeekendGapPct == null ? '—' : Number(details.typicalWeekendGapPct).toFixed(2) + '%';
+    const buffer = details.currentBufferPct == null ? '—' : Number(details.currentBufferPct).toFixed(2) + ' pts';
+    const adjusted = details.adjustedGapPct == null ? '—' : Number(details.adjustedGapPct).toFixed(2) + '%';
+    const text = 'Weekend Gap Guard\n\n' +
+      alert.title + '\n' +
+      alert.message + '\n\n' +
+      'Symbol: ' + symbol + '\n' +
+      'Weekend gap (P75 downside): ' + gap + '\n' +
+      'Adjusted gap signal: ' + adjusted + '\n' +
+      'Current liquidation buffer: ' + buffer + '\n\n' +
+      'This is a risk-monitoring alert. Any Kamino action still requires your wallet signature.';
+
+    try {
+      const delivered = await sendTelegram(String(link.telegram_chat_id), text);
+      if (delivered) {
+        await supabase.from('wgg_alerts').update({ telegram_sent_at: new Date().toISOString() }).eq('id', alert.id);
+        sent += 1;
+      } else {
+        skipped += 1;
+      }
+    } catch {
+      skipped += 1;
+    }
+  }
+
+  return json({ processed: (alerts ?? []).length, sent, skipped, botConfigured: Boolean(TELEGRAM_BOT_TOKEN) });
+});
