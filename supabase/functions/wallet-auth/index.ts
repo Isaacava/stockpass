@@ -64,6 +64,25 @@ function challengeMessage(wallet: string, nonce: string, issuedAt: string, expir
   ].join('\n');
 }
 
+async function validateSession(request: Request, wallet: string) {
+  const clientInfo = request.headers.get('x-client-info') ?? '';
+  const match = clientInfo.match(/(?:^|\s)stockpass-session=([^\s]+)/);
+  const token = match?.[1] ?? '';
+  if (!token || !wallet) return null;
+
+  const tokenHash = await sha256(token);
+  const { data, error } = await admin
+    .from('stockpass_wallet_auth_sessions')
+    .select('wallet,expires_at')
+    .eq('token_hash', tokenHash)
+    .eq('wallet', wallet)
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return { wallet: data.wallet, expiresAt: data.expires_at };
+}
+
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
@@ -75,6 +94,12 @@ Deno.serve(async (request) => {
 
     if (!wallet || !isValidWallet(wallet)) {
       return json({ error: 'A valid Solana wallet address is required.' }, 400);
+    }
+
+    if (action === 'validate') {
+      const session = await validateSession(request, wallet);
+      if (!session) return json({ error: 'Wallet session is invalid or expired.' }, 401);
+      return json(session);
     }
 
     if (action === 'challenge') {
