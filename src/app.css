@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-sp-bg: #070b12;
+  --color-sp-panel: #0d131d;
+  --color-sp-panel-2: #111a26;
+  --color-sp-border: #1d2a3a;
+  --color-sp-border-strong: #2a3a4f;
+  --color-sp-text: #e8eef6;
+  --color-sp-muted: #7f8ea3;
+  --color-sp-blue: #6d8cff;
+  --color-sp-green: #35d19a;
+  --color-sp-yellow: #e7c766;
+  --color-sp-red: #ff6b5d;
+}
+
+.sp-dapp {
+  --sp-bg: #070b12;
+  --sp-panel: #0d131d;
+  --sp-panel-2: #111a26;
+  --sp-border: #1d2a3a;
+  --sp-border-strong: #2a3a4f;
+  --sp-text: #e8eef6;
+  --sp-muted: #7f8ea3;
+  --sp-blue: #6d8cff;
+  --sp-green: #35d19a;
+  --sp-yellow: #e7c766;
+  --sp-red: #ff6b5d;
+  min-height: 100vh;
+  background: var(--sp-bg);
+  color: var(--sp-text);
+  font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+.sp-dapp button,
+.sp-dapp input,
+.sp-dapp select {
+  font: inherit;
+}
+
+.sp-dapp button:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+.sp-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.sp-scrollbar::-webkit-scrollbar-thumb { background: #24364c; border-radius: 999px; }
+.sp-num { font-family: "JetBrains Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+.sp-panel { background: var(--sp-panel); border: 1px solid var(--sp-border); }
+.sp-panel-2 { background: var(--sp-panel-2); border: 1px solid var(--sp-border); }
+.sp-grid-bg { background-image: linear-gradient(rgba(110, 140, 255, .04) 1px, transparent 1px), linear-gradient(90deg, rgba(110, 140, 255, .04) 1px, transparent 1px); background-size: 32px 32px; }
+.sp-focus:focus-visible { outline: 2px solid var(--sp-blue); outline-offset: 2px; }
