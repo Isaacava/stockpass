@@ -75,6 +75,7 @@ export default async function handler(req: any, res: any) {
     const withdrawReserveAddress = typeof body.withdrawReserveAddress === 'string' ? body.withdrawReserveAddress.trim() : '';
     const amountBaseUnits = typeof body.amountBaseUnits === 'string' ? body.amountBaseUnits : '';
     const withdrawAmountBaseUnits = typeof body.withdrawAmountBaseUnits === 'string' ? body.withdrawAmountBaseUnits : '';
+    const createPosition = actionType === 'deposit' && body.createPosition === true;
 
     if (!validAddress(wallet)) return json(res, { error: 'Invalid wallet address.' }, 400);
     if (!ACTIONS.has(actionType)) return json(res, { error: 'Unsupported Kamino action.' }, 400);
@@ -90,8 +91,11 @@ export default async function handler(req: any, res: any) {
         return json(res, { error: 'withdrawAmountBaseUnits must be a positive unsigned integer string for close.' }, 400);
       }
     } else if (['deposit', 'borrow', 'repay', 'withdraw'].includes(actionType)) {
-      if (!validAddress(obligationAddress) || !validAddress(reserveAddress)) {
-        return json(res, { error: 'This Kamino action requires a valid obligation and reserve address.' }, 400);
+      if (!validAddress(reserveAddress)) {
+        return json(res, { error: 'This Kamino action requires a valid reserve address.' }, 400);
+      }
+      if (!createPosition && !validAddress(obligationAddress)) {
+        return json(res, { error: 'This Kamino action requires a valid obligation address.' }, 400);
       }
     } else if (actionType === 'supply') {
       if (!validAddress(reserveAddress)) return json(res, { error: 'Supply requires a valid reserve address.' }, 400);
@@ -128,7 +132,7 @@ export default async function handler(req: any, res: any) {
     const currentLedgerInstant = await getCurrentLedgerInstant(rpc as never, 'confirmed');
 
     let obligation: any = null;
-    if (actionType !== 'supply') {
+    if (actionType !== 'supply' && !createPosition) {
       obligation = await market.getObligationByAddress(address(obligationAddress));
       if (!obligation) return json(res, { error: 'The selected Kamino obligation no longer exists. Refresh first.' }, 400);
 
@@ -162,9 +166,10 @@ export default async function handler(req: any, res: any) {
           amount: amountBaseUnits,
           reserveAddress: address(reserveAddress),
           owner,
-          obligation,
-          useV2Ixs: true,
+          obligation: createPosition ? new VanillaObligation(PROGRAM_ID) : obligation,
+          useV2Ixs: createPosition ? false : true,
           scopeRefreshConfig: undefined,
+          includeAtaIxs: createPosition,
         });
         break;
       case 'borrow':
@@ -235,7 +240,7 @@ export default async function handler(req: any, res: any) {
       withdraw_amount_base_units: actionType === 'close' ? withdrawAmountBaseUnits : null,
       status: 'prepared',
       kamino_program_id: KAMINO_PROGRAM_ID,
-      metadata: { instructionCount: instructions.length, lookupTables: action.luts.map(String), preparedInstructions: instructions },
+      metadata: { instructionCount: instructions.length, lookupTables: action.luts.map(String), preparedInstructions: instructions, createsPosition: createPosition },
     }).select('id').single();
 
     if (recordResult.error || !recordResult.data?.id) {
