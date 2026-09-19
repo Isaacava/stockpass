@@ -64,14 +64,6 @@ function decodeBase64(value: string): Uint8Array {
   return bytes;
 }
 
-function navIcon(page: Page) {
-  if (page === 'dashboard') return <LayoutDashboard size={16} />;
-  if (page === 'positions') return <ListChecks size={16} />;
-  if (page === 'risk') return <ShieldAlert size={16} />;
-  if (page === 'actions') return <Zap size={16} />;
-  return <Eye size={16} />;
-}
-
 export default function WeekendGapGuardWorkspace() {
   const { walletProvider } = useAppKitProvider<WggWalletProvider>('solana');
   const { address, isConnected } = useAppKitAccount({ namespace: 'solana' });
