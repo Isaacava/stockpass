@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, Bell, CircleHelp, Gauge, LoaderCircle, RefreshCw, ShieldCheck, Wallet } from 'lucide-react';
 import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
-import type { Provider } from '@reown/appkit-adapter-solana/react';
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { discoverKaminoXStockPositions, type KaminoXStockPosition } from './lib/kamino';
 import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
@@ -11,6 +10,11 @@ import { readWalletSessionToken } from './lib/walletSession';
 import './weekend-gap-guard.css';
 
 const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+
+type WggWalletProvider = {
+  signMessage: (message: Uint8Array) => Promise<Uint8Array>;
+  signTransaction: <T>(transaction: T) => Promise<T>;
+};
 
 type PreparedInstruction = {
   programAddress: string;
@@ -43,7 +47,7 @@ function decodeBase64(value: string): Uint8Array {
 
 export default function WeekendGapGuardWorkspace() {
   const { open } = useAppKit();
-  const { walletProvider } = useAppKitProvider<Provider>('solana');
+  const { walletProvider } = useAppKitProvider<WggWalletProvider>('solana');
   const { address, isConnected } = useAppKitAccount();
   const [positions, setPositions] = useState<KaminoXStockPosition[]>([]);
   const [pythPrices, setPythPrices] = useState<PythPriceMap>({});
