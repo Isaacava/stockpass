@@ -264,7 +264,7 @@ export default function WeekendGapGuardWorkspace() {
     if (window.location.pathname === path) return;
     window.history.pushState({}, '', path);
     setRoute(path);
-    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    window.scrollTo(0, 0);
   }
 
   if (!authenticated) {
