@@ -352,7 +352,7 @@ export default function WggDashboard({
             <div className="sp-market-item" key={row.stock.mint}>
               <div><b>{row.symbol}</b><span>{row.price ? money(row.price.price) : 'Price unavailable'}</span></div>
               <div><span>Gap P75</span><strong>{row.gap?.typicalWeekendGapPct != null ? pct(row.gap.typicalWeekendGapPct) : '—'}</strong></div>
-              <a href={row.price?.sourceUrl ?? '#'} target="_blank" rel="noreferrer" aria-label={`Open market source for ${row.symbol}`} className={row.price?.sourceUrl ? 'sp-market-link' : 'sp-market-link is-disabled'}><ExternalLink size={13} /></a>
+              <span className="sp-market-link is-disabled" title="Current price source: xStocks"><ExternalLink size={13} /></span>
             </div>
           ))}
           {!rows.length && <div className="sp-market-empty">Market context will appear after a real position is found.</div>}
