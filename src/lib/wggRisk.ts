@@ -1,5 +1,6 @@
 export type WeekendRiskInput = {
-  currentBufferPct: number;
+  currentLtvPct: number;
+  liquidationLtvPct: number;
   typicalWeekendGapPct: number;
   earningsRisk?: boolean;
   earningsMultiplier?: number;
@@ -7,30 +8,48 @@ export type WeekendRiskInput = {
 
 export type WeekendRiskResult = {
   adjustedGapPct: number;
+  stressedLtvPct: number;
+  liquidationDistancePct: number;
   deficitPct: number;
   status: 'safe' | 'watch' | 'flagged';
 };
 
 /**
- * Pure first-pass risk rule. Market/oracle inputs are supplied by trusted
- * backend services; this module deliberately does not fetch prices itself.
+ * Weekend stress test for an xStock-backed Kamino obligation.
+ *
+ * The historical downside gap is a collateral-price shock, so WGG first
+ * stresses the position's LTV rather than comparing unlike units
+ * (price-percent vs LTV percentage points).
+ *
+ * stressed LTV = current LTV / (1 - downside gap)
  */
 export function evaluateWeekendRisk(input: WeekendRiskInput): WeekendRiskResult {
   const earningsMultiplier = input.earningsRisk ? Math.max(1, input.earningsMultiplier ?? 1.25) : 1;
   const adjustedGapPct = Math.max(0, input.typicalWeekendGapPct) * earningsMultiplier;
-  const deficitPct = Math.max(0, adjustedGapPct - Math.max(0, input.currentBufferPct));
+  const currentLtvPct = Math.max(0, input.currentLtvPct);
+  const liquidationLtvPct = Math.max(0, input.liquidationLtvPct);
 
-  if (deficitPct > 0) return { adjustedGapPct, deficitPct, status: 'flagged' };
-  if (input.currentBufferPct <= adjustedGapPct * 1.2) return { adjustedGapPct, deficitPct: 0, status: 'watch' };
-  return { adjustedGapPct, deficitPct: 0, status: 'safe' };
+  // A gap at/above 100% is not a usable linear price scenario; cap the
+  // denominator so the UI fails toward a clearly stressed state.
+  const remainingCollateralFactor = Math.max(0.01, 1 - adjustedGapPct / 100);
+  const stressedLtvPct = currentLtvPct / remainingCollateralFactor;
+  const liquidationDistancePct = Math.max(0, liquidationLtvPct - stressedLtvPct);
+  const deficitPct = Math.max(0, stressedLtvPct - liquidationLtvPct);
+
+  if (deficitPct > 0) {
+    return { adjustedGapPct, stressedLtvPct, liquidationDistancePct, deficitPct, status: 'flagged' };
+  }
+
+  // Keep a visible watch band when the stressed scenario leaves only a small
+  // amount of liquidation distance.
+  const watchDistance = Math.max(1.5, liquidationLtvPct * 0.02);
+  if (liquidationDistancePct <= watchDistance) {
+    return { adjustedGapPct, stressedLtvPct, liquidationDistancePct, deficitPct: 0, status: 'watch' };
+  }
+
+  return { adjustedGapPct, stressedLtvPct, liquidationDistancePct, deficitPct: 0, status: 'safe' };
 }
 
-/**
- * Algebraic first-pass estimate for how much debt must be repaid to move an
- * obligation from its current LTV to a target LTV, holding collateral value
- * constant. This is only an action-planning estimate; the final Kamino action
- * must be rebuilt against fresh on-chain state before signing.
- */
 export function calculateRepayUsdForTargetLtv(
   debtUsd: number,
   collateralUsd: number,
@@ -43,11 +62,6 @@ export function calculateRepayUsdForTargetLtv(
   return Math.max(0, debtUsd - targetDebtUsd);
 }
 
-/**
- * Algebraic first-pass estimate for how much collateral value would need to be
- * added to reach a target LTV, holding debt constant. Final transaction
- * construction must use a fresh Kamino state read and exact reserve decimals.
- */
 export function calculateCollateralUsdForTargetLtv(
   debtUsd: number,
   collateralUsd: number,
@@ -60,9 +74,6 @@ export function calculateCollateralUsdForTargetLtv(
   return Math.max(0, requiredCollateralUsd - collateralUsd);
 }
 
-/**
- * Backward-compatible repay helper retained for any existing callers.
- */
 export function calculateRepayUsd(debtUsd: number, currentBufferPct: number, targetBufferPct: number): number {
   if (!Number.isFinite(debtUsd) || debtUsd <= 0) return 0;
   if (!Number.isFinite(currentBufferPct) || !Number.isFinite(targetBufferPct) || targetBufferPct <= currentBufferPct) return 0;
