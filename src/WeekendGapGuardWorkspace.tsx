@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, Bell, CircleHelp, Gauge, LoaderCircle, RefreshCw, ShieldCheck, Wallet } from 'lucide-react';
 import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
@@ -6,7 +6,7 @@ import { discoverKaminoXStockPositions, type KaminoXStockPosition } from './lib/
 import KaminoActionConsole from './KaminoActionConsole';
 import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
 import { fetchWggMarketData, type XStockPriceMap, type WeekendGapMap } from './lib/wggMarketData';
-import { refreshWalletSession } from './lib/walletAuth';
+import { clearWalletSession, refreshWalletSession } from './lib/walletAuth';
 import { readWalletSessionToken } from './lib/walletSession';
 import './weekend-gap-guard.css';
 
@@ -49,7 +49,7 @@ function decodeBase64(value: string): Uint8Array {
 export default function WeekendGapGuardWorkspace() {
   const { open } = useAppKit();
   const { walletProvider } = useAppKitProvider<WggWalletProvider>('solana');
-  const { address, isConnected } = useAppKitAccount();
+  const { address, isConnected } = useAppKitAccount({ namespace: 'solana' });
   const [positions, setPositions] = useState<KaminoXStockPosition[]>([]);
   const [marketPrices, setMarketPrices] = useState<XStockPriceMap>({});
   const [weekendGaps, setWeekendGaps] = useState<WeekendGapMap>({});
@@ -61,6 +61,8 @@ export default function WeekendGapGuardWorkspace() {
   const [signature, setSignature] = useState('');
   const [error, setError] = useState('');
   const [lastLoaded, setLastLoaded] = useState<Date | null>(null);
+  const [authStatus, setAuthStatus] = useState<'signed_out' | 'authenticating' | 'authenticated' | 'error'>('signed_out');
+  const [authError, setAuthError] = useState('');
 
   const rows = useMemo<Row[]>(() => positions.flatMap((position) => position.xStocks.map((stock) => {
     const symbol = stock.symbol.replace(/x$/i, '');
@@ -77,6 +79,39 @@ export default function WeekendGapGuardWorkspace() {
     else if (row.risk?.status === 'safe') acc.safe += 1;
     return acc;
   }, { flagged: 0, watch: 0, safe: 0 });
+
+  async function authenticateCurrentWallet() {
+    if (!address || !walletProvider?.signMessage) {
+      setAuthStatus('error');
+      setAuthError('Your Solana wallet connected, but message signing is not available yet.');
+      return;
+    }
+    setAuthStatus('authenticating');
+    setAuthError('');
+    try {
+      await refreshWalletSession({
+        publicKey: { toBase58: () => address },
+        signMessage: walletProvider.signMessage.bind(walletProvider),
+      });
+      setAuthStatus('authenticated');
+    } catch (e) {
+      clearWalletSession();
+      setAuthStatus('error');
+      setAuthError(e instanceof Error ? e.message : 'Wallet authentication failed.');
+    }
+  }
+
+  useEffect(() => {
+    if (!isConnected || !address) {
+      clearWalletSession();
+      setAuthStatus('signed_out');
+      setAuthError('');
+      return;
+    }
+    if (authStatus === 'authenticated' || authStatus === 'authenticating') return;
+    if (!walletProvider?.signMessage) return;
+    void authenticateCurrentWallet();
+  }, [address, isConnected, walletProvider]);
 
   async function scan() {
     if (!address) return;
@@ -197,10 +232,12 @@ export default function WeekendGapGuardWorkspace() {
     } finally { setSigning(false); }
   }
 
+  const authenticated = isConnected && authStatus === 'authenticated';
+
   return <div className="wgg-app">
     <header className="wgg-header">
       <div className="wgg-brand"><span className="wgg-mark">WG</span><div><strong>Weekend Gap Guard</strong><small>risk protection for xStock collateral</small></div></div>
-      <div className="wgg-header-right"><span className="wgg-mainnet"><i /> SOLANA MAINNET</span>{isConnected ? <div className="wgg-wallet"><Wallet size={14} />{address ? `${address.slice(0, 4)}…${address.slice(-4)}` : 'Connected'}</div> : <button className="wgg-connect" onClick={() => void open()}>Connect wallet</button>}</div>
+      <div className="wgg-header-right"><span className="wgg-mainnet"><i /> SOLANA MAINNET</span>{authenticated ? <div className="wgg-wallet"><Wallet size={14} />{address ? `${address.slice(0, 4)}…${address.slice(-4)}` : 'Connected'}</div> : <button className="wgg-connect" onClick={() => authenticated ? undefined : (!isConnected ? void open({ view: 'Connect', namespace: 'solana' }) : void authenticateCurrentWallet())} disabled={authStatus === 'authenticating'}>{authStatus === 'authenticating' ? 'Authenticating…' : isConnected ? 'Sign to enter' : 'Connect wallet'}</button>}</div>
     </header>
     <main className="wgg-main">
       <section className="wgg-hero">
@@ -235,7 +272,7 @@ export default function WeekendGapGuardWorkspace() {
           </article>;
         })}</div>}
       </section>}
-      {isConnected && <KaminoActionConsole address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
+      {authenticated && <KaminoActionConsole address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
       <section className="wgg-explain"><div><div className="wgg-eyebrow">HOW IT WORKS</div><h2>Not a lending protocol.<br />A protection layer.</h2></div><div className="wgg-steps"><article><b>01</b><strong>Discover</strong><span>Read the wallet's real Kamino obligations.</span></article><article><b>02</b><strong>Assess</strong><span>Measure the live buffer against the historical gap model.</span></article><article><b>03</b><strong>Protect</strong><span>Prepare a specific Kamino action for controlled approval.</span></article></div></section>
       <footer className="wgg-footer"><span>Weekend Gap Guard</span><span>Solana mainnet · Kamino overlay · no custody</span><span><CircleHelp size={12} /> No demo balance is presented as real.</span></footer>
     </main>
