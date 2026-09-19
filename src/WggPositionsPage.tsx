@@ -1,4 +1,4 @@
-import { Layers3, RefreshCw, ShieldAlert, ShieldCheck, TrendingDown } from 'lucide-react';
+import { Layers3, RefreshCw, ShieldAlert, ShieldCheck, TrendingDown, type LucideIcon } from 'lucide-react';
 import type { KaminoXStockPosition } from './lib/kamino';
 import type { XStockPriceMap, WeekendGapMap } from './lib/wggMarketData';
 import { evaluateWeekendRisk } from './lib/wggRisk';
@@ -24,13 +24,13 @@ function short(v: string) {
 
 function RiskBadge({ status }: { status?: 'safe' | 'watch' | 'flagged' | null }) {
   if (!status) return <span className="sp-status bg-soft text-faint">Pending</span>;
-  const meta = {
-    safe: ['Safe', 'bg-safe-soft text-safe', ShieldCheck],
-    watch: ['Watch', 'bg-watch-soft text-watch', TrendingDown],
-    flagged: ['Flagged', 'bg-flag-soft text-flag', ShieldAlert],
-  }[status];
-  const Icon = meta[2];
-  return <span className={'sp-status ' + meta[1]}><span className={'size-1.5 rounded-full ' + (status === 'safe' ? 'bg-safe' : status === 'watch' ? 'bg-watch' : 'bg-flag')} /><Icon size={12} />{meta[0]}</span>;
+  const meta: { label: string; classes: string; icon: LucideIcon } = status === 'safe'
+    ? { label: 'Safe', classes: 'bg-safe-soft text-safe', icon: ShieldCheck }
+    : status === 'watch'
+      ? { label: 'Watch', classes: 'bg-watch-soft text-watch', icon: TrendingDown }
+      : { label: 'Flagged', classes: 'bg-flag-soft text-flag', icon: ShieldAlert };
+  const Icon = meta.icon;
+  return <span className={'sp-status ' + meta.classes}><span className={'size-1.5 rounded-full ' + (status === 'safe' ? 'bg-safe' : status === 'watch' ? 'bg-watch' : 'bg-flag')} /><Icon size={12} />{meta.label}</span>;
 }
 
 export default function WggPositionsPage({
