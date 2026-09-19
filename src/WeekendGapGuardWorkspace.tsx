@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, Bell, CircleHelp, Gauge, LoaderCircle, RefreshCw, ShieldCheck, Wallet } from 'lucide-react';
 import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
@@ -172,7 +171,7 @@ export default function WeekendGapGuardWorkspace() {
       const connection = new Connection(endpoint, 'confirmed');
       const latest = await connection.getLatestBlockhash('confirmed');
       const instructions = prepared.instructions.map((ix) => new TransactionInstruction({
-        programId: new PublicKey(ix.programAddress), data: decodeBase64(ix.data),
+        programId: new PublicKey(ix.programAddress), data: Buffer.from(decodeBase64(ix.data)),
         keys: ix.accounts.map((account) => ({ pubkey: new PublicKey(account.address), isSigner: account.signer, isWritable: account.writable })),
       }));
       const lookupTables = [];
