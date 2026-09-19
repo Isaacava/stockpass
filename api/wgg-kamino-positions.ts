@@ -1,4 +1,6 @@
 
+import { discoverKaminoXStockPositions } from '../src/lib/kamino';
+
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY =
   process.env.SUPABASE_PUBLISHABLE_KEY ||
@@ -62,7 +64,6 @@ export default async function handler(req: any, res: any) {
     const auth = await validateSession(req, wallet);
     if (!auth.ok) return json(res, { error: auth.error }, 401);
 
-    const { discoverKaminoXStockPositions } = await import('../src/lib/kamino');
     const positions = await discoverKaminoXStockPositions(wallet, MAINNET_RPC);
     return json(res, { wallet, positions });
   } catch (error) {
