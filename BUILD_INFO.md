@@ -821,3 +821,44 @@ The separate Supabase project named `StockPassport` (`pwcsnthuvebzfpqprslw`) cur
 
 The Supabase browser client now reads `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` from Vite environment variables with the existing project values as safe fallbacks.
 
+## Native DeFi UI rebuild — 2026-09-19
+
+The connected WGG application has been visually rebuilt around a native DeFi wallet/workspace pattern rather than the previous editorial/marketing-card style.
+
+### UI architecture
+
+- Tailwind CSS 4.3.3 is now included with the official Vite plugin.
+- The authenticated WGG workspace uses a dark, dense account surface with a persistent desktop navigation rail and a compact mobile bottom navigation.
+- Typography now uses Inter for interface text and JetBrains Mono for addresses, amounts, percentages, and protocol metadata.
+- Dashboard, Positions, Guard, Actions, and Monitoring use the same account-first visual system.
+- The public landing page remains separate from the authenticated DeFi workspace.
+
+### Dashboard
+
+- Replaced oversized editorial headings with compact account command-center hierarchy.
+- Added dense KPI cards for real collateral, borrowed value, max LTV, and protection state.
+- Guard state now occupies the primary panel with current/stressed/liquidation LTV values.
+- Live positions are shown as a compact Kamino table rather than blog-like content blocks.
+- Source hierarchy remains visible without presenting fabricated PnL or balances.
+
+### Actions
+
+The Actions route is now a dedicated Kamino execution workbench.
+
+- Action selector for Borrow, Supply, Add collateral, Repay, Withdraw, and Close position.
+- Separate transaction-preview rail showing network, protocol, custody, and wallet approval.
+- Form controls use dense wallet/DApp conventions instead of marketing cards.
+- Preparation and wallet review states are visually separated.
+- Confirmed transaction state is shown separately from preparation.
+- Position-dependent actions are unavailable until a real Kamino position exists.
+
+### Runtime error hardening
+
+KaminoActionConsole and the protection preparation flow now read server responses as text first and then parse JSON. When a serverless route returns a non-JSON response such as an error page, the UI reports the actual response text instead of throwing the literal JSON parser error.
+
+### Verification state
+
+The container environment cannot resolve GitHub DNS, so a local production build could not be executed here.
+
+Vercel has accepted the Tailwind dependency/configuration commit, but the subsequent UI commits are currently being throttled by the Vercel deployment rate limit. The latest GitHub commit currently has a Vercel failure status pointing at the project's build-rate-limit page. A READY deployment containing the full UI rebuild has therefore not yet been independently confirmed.
+
