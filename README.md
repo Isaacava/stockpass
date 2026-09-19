@@ -52,3 +52,6 @@ npm run dev
 ```
 
 Add the official asset mint addresses and Supabase public project values to `.env.local` before testing live verification and mainnet flows.
+
+
+<!-- UI build verification branch -->
