@@ -3,6 +3,7 @@ export const STOCKPASS_FRONTEND_CONFIG = {
   supabasePublishableKey: 'sb_publishable_eCgd2QEH5mUlEK5vHIonyw_v0E8QFrp',
   solanaMainnetRpc: 'https://api.mainnet-beta.solana.com',
   reownProjectId: '1dbe8fd5e4974ae7c80d074c4082b5a0',
+  telegramBotUsername: '',
 } as const;
 
 export const SUPABASE_URL =
@@ -24,4 +25,9 @@ export const SOLANA_MAINNET_RPC =
 export const REOWN_PROJECT_ID =
   STOCKPASS_FRONTEND_CONFIG.reownProjectId ||
   import.meta.env.VITE_REOWN_PROJECT_ID ||
+  '';
+
+export const TELEGRAM_BOT_USERNAME =
+  STOCKPASS_FRONTEND_CONFIG.telegramBotUsername ||
+  import.meta.env.VITE_TELEGRAM_BOT_USERNAME ||
   '';
