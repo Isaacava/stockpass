@@ -1088,3 +1088,22 @@ Code is committed through:
 The live Supabase migration and both WGG Edge Functions are deployed.
 
 Remaining runtime gate: Vercel's automatic deployment queue must finish a green build, followed by a real wallet smoke test against a connected mainnet wallet. The external deployment fetch is currently SSO-protected, so anonymous HTTP cannot be used as the smoke test.
+
+## Prototype-faithful WGG frontend — 2026-09-19
+
+Implemented the supplied StockPass interactive HTML pattern as the real authenticated WGG frontend.
+
+Touched:
+- `src/WeekendGapGuardWorkspace.tsx` — compact wallet header, five-route bottom navigation, preserved authenticated scan/action/risk state.
+- `src/WggDashboard.tsx` — live protection hero, LTV stress gauge, real KPI totals, risk filter chips, tappable position detail sheet, real protection actions, provenance.
+- `src/WggPositionsPage.tsx` — live full positions list, real rescan, gauges, xStocks/Twelve Data context.
+- `src/WggRiskPage.tsx` — per-position risk cards/gauges and live Safe/Watch/Flagged counts/actions.
+- `src/KaminoActionConsole.tsx` — wallet-style action UI while preserving the real Kamino prepare/sign/confirm/verify flow; quick fills are sourced only from real position amounts and rounded to reserve precision.
+- `src/WggMonitoringPage.tsx` — persisted last-checked state, alerts, monitored positions and Telegram link state; manual checks still call the trusted monitoring endpoint.
+- `src/app.css` — exact light prototype token system and component primitives, including the Solana gradient only on the brand mark and center Actions button.
+- `src/config.ts`, `src/vite-env.d.ts` — centralized Telegram frontend config with manual-value-first fallback.
+- `api/wgg-monitor.ts` — authenticated read-only state endpoint for the monitoring screen; existing sync/cron worker behavior remains intact.
+
+No demo balances, fabricated risk values, fake alerts, timeout-based confirmations, or simulated wallet signing were introduced.
+
+Verification gate: source-level review completed. Local production build cannot currently be executed from this runtime because the repository checkout cannot be fetched due to GitHub DNS resolution failure. Latest GitHub/Vercel CI status must be checked before claiming deployment readiness.
