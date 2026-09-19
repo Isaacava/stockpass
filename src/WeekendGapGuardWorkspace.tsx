@@ -14,7 +14,7 @@ import { clearWalletSession, refreshWalletSession } from './lib/walletAuth';
 import { readWalletSessionToken } from './lib/walletSession';
 import './weekend-gap-guard.css';
 
-const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || '';
+const endpoint = import.meta.env.VITE_SOLANA_RPC_URL || import.meta.env.VITE_SOLANA_MAINNET_RPC_URL || '';
 
 type WggWalletProvider = {
   signMessage: (message: Uint8Array) => Promise<Uint8Array>;
@@ -118,7 +118,7 @@ export default function WeekendGapGuardWorkspace() {
 
   async function scan() {
     if (!address) return;
-    if (!endpoint) { setError('VITE_SOLANA_RPC_URL is not configured.'); return; }
+    if (!endpoint) { setError('A browser Solana mainnet RPC is not configured. Set VITE_SOLANA_RPC_URL (or VITE_SOLANA_MAINNET_RPC_URL) in Vercel and redeploy.'); return; }
     setLoading(true); setError(''); setPrepared(null); setSignature('');
     try {
       const { discoverKaminoXStockPositions } = await import('./lib/kamino');
@@ -329,6 +329,14 @@ export default function WeekendGapGuardWorkspace() {
       {page === 'actions' && <WggActionsPage address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
 
       {page === 'monitoring' && <WggMonitoringPage address={address ?? ''} />}
+
+      <nav className="sp-mobile-nav" aria-label="StockPass app mobile navigation">
+        <button className={page === 'dashboard' ? 'is-active' : ''} onClick={() => navigate('/app')}>Overview</button>
+        <button className={page === 'positions' ? 'is-active' : ''} onClick={() => navigate('/app/positions')}>Positions</button>
+        <button className={page === 'risk' ? 'is-active' : ''} onClick={() => navigate('/app/risk')}>Guard</button>
+        <button className={page === 'actions' ? 'is-active' : ''} onClick={() => navigate('/app/actions')}>Actions</button>
+        <button className={page === 'monitoring' ? 'is-active' : ''} onClick={() => navigate('/app/monitoring')}>Monitoring</button>
+      </nav>
 
       <footer className="wgg-footer">
         <span>StockPass / Weekend Gap Guard</span>
