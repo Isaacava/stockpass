@@ -64,11 +64,11 @@ export default function WeekendGapGuardWorkspace() {
 
   const rows = useMemo<Row[]>(() => positions.flatMap((position) => position.xStocks.map((stock) => {
     const symbol = stock.symbol.replace(/x$/i, '');
-    const gap = weekendGaps[symbol];
+    const gap = weekendGaps[stock.symbol];
     const risk = position.liquidationBufferPct != null && gap?.typicalWeekendGapPct != null
       ? evaluateWeekendRisk({ currentBufferPct: position.liquidationBufferPct, typicalWeekendGapPct: gap.typicalWeekendGapPct })
       : null;
-    return { position, stock, symbol, gap, risk, price: marketPrices[symbol] };
+    return { position, stock, symbol, gap, risk, price: marketPrices[stock.symbol] };
   })), [positions, weekendGaps, marketPrices]);
 
   const counts = rows.reduce((acc, row) => {
@@ -85,7 +85,7 @@ export default function WeekendGapGuardWorkspace() {
     try {
       const discovered = await discoverKaminoXStockPositions(address, endpoint);
       setPositions(discovered);
-      const symbols = Array.from(new Set(discovered.flatMap((p) => p.xStocks.map((s) => s.symbol.replace(/x$/i, '')))));
+      const symbols = Array.from(new Set(discovered.flatMap((p) => p.xStocks.map((s) => s.symbol))));
       if (!symbols.length) {
         setMarketPrices({});
         setWeekendGaps({});
@@ -214,7 +214,7 @@ export default function WeekendGapGuardWorkspace() {
         {!loading && positions.length === 0 && <div className="wgg-empty"><AlertTriangle size={21} /><strong>No xStock-backed Kamino obligation found</strong><span>The scan completed against mainnet and no fake position was inserted.</span></div>}
         {loading && <div className="wgg-empty"><LoaderCircle size={21} className="wgg-spin" /><strong>Reading Kamino, xStocks and weekend history</strong><span>This is a read-only mainnet scan.</span></div>}
         {!loading && positions.length > 0 && <div className="wgg-position-list">{positions.map((position) => {
-          const leadSymbol = position.xStocks[0]?.symbol.replace(/x$/i, '');
+          const leadSymbol = position.xStocks[0]?.symbol;
           const leadGap = leadSymbol ? weekendGaps[leadSymbol] : undefined;
           return <article className="wgg-position-card" key={position.obligation}>
             <div className="wgg-position-head"><div><span className="wgg-position-label">OBLIGATION</span><strong>{position.obligation.slice(0, 6)}…{position.obligation.slice(-6)}</strong></div><span className="wgg-ltv">LTV {position.ltvPct != null ? `${position.ltvPct.toFixed(2)}%` : '—'}</span></div>
