@@ -1,8 +1,6 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  readonly VITE_SOLANA_RPC_URL?: string;
-  readonly VITE_SOLANA_MAINNET_RPC_URL?: string;
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string;
   readonly VITE_REOWN_PROJECT_ID?: string;
