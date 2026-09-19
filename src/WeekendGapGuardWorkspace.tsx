@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, Bell, CircleHelp, Gauge, LoaderCircle, RefreshCw, ShieldCheck, Wallet } from 'lucide-react';
 import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
-import type { Provider } from '@reown/appkit-adapter-solana';
+import type { Provider } from '@reown/appkit-adapter-solana/react';
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { discoverKaminoXStockPositions, type KaminoXStockPosition } from './lib/kamino';
 import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
