@@ -418,12 +418,11 @@ export default function WeekendGapGuardWorkspace() {
         {page === 'actions' && <WggActionsPage address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
         {page === 'monitoring' && <WggMonitoringPage address={address ?? ''} />}
 
-        <div className="mt-7 grid grid-cols-3 gap-2 pb-2">
-          <div className="sp-provenance"><div><span>Position</span><strong>Kamino</strong></div></div>
-          <div className="sp-provenance"><div><span>Price</span><strong>xStocks</strong></div></div>
-          <div className="sp-provenance"><div><span>Scenario</span><strong>Twelve Data</strong></div></div>
+        <div className="sp-provenance mt-7 pb-2">
+          <div><span>Position</span><strong>Kamino</strong></div>
+          <div><span>Price</span><strong>xStocks</strong></div>
+          <div><span>Scenario</span><strong>Twelve Data</strong></div>
         </div>
-        {error && <div className="sp-alert-card sp-alert-danger mt-3"><AlertTriangle size={15} /><div className="sp-alert-copy">{error}</div></div>}
       </main>
 
       <nav className="sp-bottom-nav" aria-label="StockPass navigation">
