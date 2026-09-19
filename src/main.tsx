@@ -1,10 +1,7 @@
 import React, { Suspense } from 'react';
 import ReactDOM from 'react-dom/client';
-import { ConnectionProvider, WalletProvider } from '@solana/wallet-adapter-react';
-import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
 import './styles.css';
 import './mobile-safety.css';
-import '@solana/wallet-adapter-react-ui/styles.css';
 import './reown';
 import WeekendGapGuardWorkspace from './WeekendGapGuardWorkspace';
 
@@ -31,4 +28,4 @@ function Root() {
   return <Suspense fallback={<Loading />}><WeekendGapGuardWorkspace /></Suspense>;
 }
 
-ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><ConnectionProvider endpoint={endpoint}><WalletProvider wallets={[]} autoConnect><WalletModalProvider><AppErrorBoundary><Root /></AppErrorBoundary></WalletModalProvider></WalletProvider></ConnectionProvider></React.StrictMode>);
+ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><AppErrorBoundary><Root /></AppErrorBoundary></React.StrictMode>);
