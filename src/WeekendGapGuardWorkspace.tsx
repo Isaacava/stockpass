@@ -4,6 +4,7 @@ import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/re
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import type { KaminoXStockPosition } from './lib/kamino';
 import KaminoActionConsole from './KaminoActionConsole';
+import WggDashboard from './WggDashboard';
 import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
 import { fetchWggMarketData, type XStockPriceMap, type WeekendGapMap } from './lib/wggMarketData';
 import { clearWalletSession, refreshWalletSession } from './lib/walletAuth';
@@ -236,6 +237,11 @@ export default function WeekendGapGuardWorkspace() {
 
   const authenticated = isConnected && authStatus === 'authenticated';
 
+  useEffect(() => {
+    if (!authenticated || lastLoaded || loading) return;
+    void scan();
+  }, [authenticated, lastLoaded, loading]);
+
   if (!authenticated) {
     return <div className="wgg-auth-transition">
       <div className="wgg-auth-panel">
@@ -252,47 +258,59 @@ export default function WeekendGapGuardWorkspace() {
   }
 
   return <div className="wgg-app">
-    <header className="wgg-header">
-      <div className="wgg-brand"><span className="wgg-mark">WG</span><div><strong>Weekend Gap Guard</strong><small>risk protection for xStock collateral</small></div></div>
-      <div className="wgg-header-right"><span className="wgg-mainnet"><i /> SOLANA MAINNET</span>{authenticated ? <div className="wgg-wallet"><Wallet size={14} />{address ? `${address.slice(0, 4)}…${address.slice(-4)}` : 'Connected'}</div> : <button className="wgg-connect" onClick={() => authenticated ? undefined : (!isConnected ? void open({ view: 'Connect', namespace: 'solana' }) : void authenticateCurrentWallet())} disabled={authStatus === 'authenticating'}>{authStatus === 'authenticating' ? 'Authenticating…' : isConnected ? 'Sign to enter' : 'Connect wallet'}</button>}</div>
+    <header className="wgg-header sp-app-header">
+      <div className="wgg-brand">
+        <span className="wgg-mark">SP</span>
+        <div><strong>STOCKPASS</strong><small>WEEKEND GAP GUARD</small></div>
+      </div>
+      <nav className="sp-header-nav" aria-label="Dashboard sections">
+        <button className="is-active" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Overview</button>
+        <button onClick={() => document.getElementById('sp-positions')?.scrollIntoView({ behavior: 'smooth' })}>Positions</button>
+        <button onClick={() => document.getElementById('sp-actions')?.scrollIntoView({ behavior: 'smooth' })}>Actions</button>
+      </nav>
+      <div className="wgg-header-right">
+        <span className="wgg-mainnet"><i /> SOLANA MAINNET</span>
+        <div className="wgg-wallet"><Wallet size={14} />{address ? `${address.slice(0, 4)}…${address.slice(-4)}` : 'Connected'}</div>
+      </div>
     </header>
-    <main className="wgg-main">
-      <section className="wgg-hero">
-        <div className="wgg-hero-copy"><div className="wgg-eyebrow"><span /> TOKENIZED-EQUITY DEFI / WEEKEND GUARD</div><h1>Stress the position<br /><em>before Monday.</em></h1><p>StockPass reads the real Kamino position, applies a historical downside shock from the xStock's Friday-to-next-session gap, and shows the resulting LTV before you approve any protection action.</p><div className="wgg-hero-actions">{!isConnected ? <button className="wgg-primary" onClick={() => void open()}>Connect wallet <ArrowRight size={15} /></button> : <button className="wgg-primary" onClick={() => void scan()} disabled={loading}>{loading ? <><LoaderCircle size={15} className="wgg-spin" /> Scanning</> : <>Scan my Kamino positions <ArrowRight size={15} /></>}</button>}<span className="wgg-hero-note"><ShieldCheck size={14} /> {!isConnected ? 'Wallet signature is required before the risk workspace unlocks.' : authStatus === 'authenticating' ? 'Approve the StockPass authentication message in your wallet.' : authStatus === 'error' ? authError : 'Authenticated wallet · monitoring is read-only; protection actions require approval.'}</span></div></div>
-        <div className="wgg-hero-card"><div className="wgg-card-top"><span>FRIDAY CHECK</span><span className="wgg-status-dot"><i /> {loading ? 'SCANNING' : isConnected ? 'READY' : 'WAITING'}</span></div><div className="wgg-risk-meter"><div style={{ width: `${isConnected ? Math.max(8, 100 - counts.flagged * 25 - counts.watch * 10) : 12}%` }} /></div><div className="wgg-meter-label"><span>Protection signal</span><strong>{counts.flagged ? `${counts.flagged} flagged` : counts.watch ? `${counts.watch} on watch` : rows.length ? 'Gap model loaded' : 'Waiting for scan'}</strong></div><div className="wgg-card-rule"><span>xStock rows</span><b>{rows.length || '—'}</b></div><div className="wgg-card-rule"><span>Flagged</span><b>{counts.flagged || '—'}</b></div><div className="wgg-card-rule"><span>Watch</span><b>{counts.watch || '—'}</b></div></div>
+
+    <main className="wgg-main sp-main">
+      <WggDashboard
+        address={address}
+        positions={positions}
+        rows={rows}
+        counts={counts}
+        loading={loading}
+        preparing={preparing}
+        authenticating={authenticating}
+        signing={signing}
+        prepared={prepared}
+        signature={signature}
+        error={error}
+        lastLoaded={lastLoaded}
+        scan={scan}
+        prepareFix={prepareFix}
+        signAndSendPrepared={signAndSendPrepared}
+      />
+
+      <div id="sp-actions">
+        <KaminoActionConsole address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />
+      </div>
+
+      <section className="wgg-explain" id="sp-method">
+        <div><div className="wgg-eyebrow">THE WGG METHOD</div><h2>From price shock<br />to signed action.</h2></div>
+        <div className="wgg-steps">
+          <article><b>01</b><strong>Read</strong><span>Load the real Kamino obligation and the current xStock market context.</span></article>
+          <article><b>02</b><strong>Stress</strong><span>Apply the historical downside gap to the live LTV and compare the stressed result with liquidation.</span></article>
+          <article><b>03</b><strong>Protect</strong><span>Prepare the amount needed to bring the position back under the scenario target, then let the wallet sign.</span></article>
+        </div>
       </section>
-      <section className="wgg-principles"><div><Gauge size={18} /><div><strong>Real Kamino state</strong><span>Collateral, debt and liquidation parameters come from the connected wallet's mainnet obligation.</span></div></div><div><Bell size={18} /><div><strong>Price-shock scenario</strong><span>Historical downside gaps are applied to the current LTV to produce a stressed-LTV scenario.</span></div></div><div><ShieldCheck size={18} /><div><strong>Wallet-approved protection</strong><span>StockPass prepares the Kamino action; the wallet remains the final authority on every fund-moving transaction.</span></div></div></section>
-      {authenticated && <section className="wgg-dashboard">
-        <div className="wgg-section-head"><div><div className="wgg-eyebrow">REAL KAMINO + XSTOCKS DATA</div><h2>Your position under stress.</h2><p>{lastLoaded ? `Mainnet scan completed ${lastLoaded.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}. WGG models the historical downside scenario against the live LTV.` : 'Scan the current Kamino Main Market to load real positions and run the weekend scenario.'}</p></div><button className="wgg-secondary" onClick={() => void scan()} disabled={loading}><RefreshCw size={14} /> Refresh</button></div>
-        {error && <div className="wgg-error"><AlertTriangle size={18} /><div><strong>Action unavailable</strong><span>{error}</span></div></div>}
-        {prepared && <div className="wgg-empty"><ShieldCheck size={21} /><strong>Protection action prepared</strong><span>{prepared.symbol} {prepared.kind} · {prepared.amountBaseUnits} base units · {prepared.instructionCount} instructions. Review it in your wallet before approval.</span><button className="wgg-primary" onClick={() => void signAndSendPrepared()} disabled={signing}>{signing ? <><LoaderCircle size={14} className="wgg-spin" /> Waiting for wallet</> : <>Review & sign <ArrowRight size={14} /></>}</button>{signature && <span>Confirmed transaction: {signature}</span>}</div>}
-        {!loading && positions.length === 0 && <div className="wgg-empty"><AlertTriangle size={21} /><strong>No xStock-backed Kamino obligation found</strong><span>The scan completed against mainnet and no fake position was inserted.</span></div>}
-        {loading && <div className="wgg-empty"><LoaderCircle size={21} className="wgg-spin" /><strong>Reading Kamino, xStocks and weekend history</strong><span>This is a read-only mainnet scan.</span></div>}
-        {!loading && positions.length > 0 && <div className="wgg-position-list">{positions.map((position) => {
-          const leadSymbol = position.xStocks[0]?.symbol;
-          const leadGap = leadSymbol ? weekendGaps[leadSymbol] : undefined;
-          const positionRisk = rows.find((row) => row.position.obligation === position.obligation)?.risk;
-          return <article className="wgg-position-card" key={position.obligation}>
-            <div className="wgg-position-head"><div><span className="wgg-position-label">OBLIGATION</span><strong>{position.obligation.slice(0, 6)}…{position.obligation.slice(-6)}</strong></div><span className="wgg-ltv">LTV {position.ltvPct != null ? `${position.ltvPct.toFixed(2)}%` : '—'}</span></div>
-            <div className="wgg-xstock-list">{position.xStocks.map((stock) => {
-              const row = rows.find((candidate) => candidate.position.obligation === position.obligation && candidate.stock.mint === stock.mint);
-              const risk = row?.risk;
-              return <div className="wgg-xstock-row" key={`${position.obligation}-${stock.mint}`}><span className="wgg-xstock-icon">{row?.symbol.slice(0, 4)}</span><div><strong>{stock.symbol}</strong><span>{stock.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} Kamino collateral units</span></div><div className="wgg-xstock-status"><span>{row?.price ? `$${row.price.price.toFixed(2)} xStocks` : 'xStocks price unavailable'}</span>{risk && <strong>{risk.status.toUpperCase()}</strong>}</div>{row && risk?.status === 'flagged' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-  <button className="wgg-secondary" onClick={() => void prepareFix(row, 'deposit')} disabled={preparing}>
-    {preparing ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} {authenticating ? 'Verify wallet' : 'Add collateral'}
-  </button>
-  {row.position.debts.length > 0 && <button className="wgg-secondary" onClick={() => void prepareFix(row, 'repay')} disabled={preparing}>
-    {preparing ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} {authenticating ? 'Verify wallet' : 'Prepare repay'}
-  </button>}
-</div>}</div>;
-            })}</div>
-            <div className="wgg-position-metrics"><div><span>Liquidation LTV</span><strong>{position.liquidationLtvPct != null ? `${position.liquidationLtvPct.toFixed(2)}%` : '—'}</strong></div><div><span>Stressed LTV</span><strong>{positionRisk?.stressedLtvPct != null ? `${positionRisk.stressedLtvPct.toFixed(2)}%` : '—'}</strong></div><div><span>Distance to liquidation</span><strong>{positionRisk?.liquidationDistancePct != null ? `${positionRisk.liquidationDistancePct.toFixed(2)} pts` : '—'}</strong></div><div><span>Borrow value</span><strong>{position.borrowValueUsd != null ? `${position.borrowValueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</strong></div></div>
-          </article>;
-        })}</div>}
-      </section>}
-      {authenticated && <KaminoActionConsole address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
-      <section className="wgg-explain"><div><div className="wgg-eyebrow">THE WGG METHOD</div><h2>From price shock<br />to signed action.</h2></div><div className="wgg-steps"><article><b>01</b><strong>Read</strong><span>Load the real Kamino obligation and the current xStock market context.</span></article><article><b>02</b><strong>Stress</strong><span>Apply the historical downside gap to the live LTV and compare the stressed result with liquidation.</span></article><article><b>03</b><strong>Protect</strong><span>Prepare the amount needed to bring the position back under the scenario target, then let the wallet sign.</span></article></div></section>
-      <footer className="wgg-footer"><span>Weekend Gap Guard</span><span>Solana mainnet · Kamino overlay · no custody</span><span><CircleHelp size={12} /> No demo balance is presented as real.</span></footer>
+
+      <footer className="wgg-footer">
+        <span>StockPass / Weekend Gap Guard</span>
+        <span>Solana mainnet · Kamino overlay · no custody</span>
+        <span><CircleHelp size={12} /> No demo balance is presented as real.</span>
+      </footer>
     </main>
   </div>;
 }
