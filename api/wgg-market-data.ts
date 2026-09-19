@@ -1,5 +1,3 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-
 const XSTOCKS_BASE = 'https://api.xstocks.fi/api/v2/public';
 const TWELVE_DATA_BASE = 'https://api.twelvedata.com';
 
@@ -68,7 +66,7 @@ const MAX_SYMBOLS = 12;
 const DEFAULT_WEEKS = 13;
 const MAX_WEEKS = 26;
 
-function json(res: VercelResponse, body: unknown, status = 200, cacheControl = 'no-store') {
+function json(res: any, body: unknown, status = 200, cacheControl = 'no-store') {
   res.status(status).setHeader('Cache-Control', cacheControl).json(body);
 }
 
@@ -281,7 +279,7 @@ function buildSummary(underlying: string, series: TwelveDataSeries, weeks: numbe
   };
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return json(res, { error: 'POST required' }, 405);
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});
