@@ -178,7 +178,7 @@ export default function WeekendGapGuardWorkspace() {
       }
       const message = new TransactionMessage({ payerKey: new PublicKey(address), recentBlockhash: latest.blockhash, instructions }).compileToV0Message(lookupTables);
       const transaction = new VersionedTransaction(message);
-      const signed = await walletProvider.signTransaction(transaction as never) as unknown as VersionedTransaction;
+      const signed = await walletProvider.signTransaction(transaction);
       const txSignature = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 2 });
       await connection.confirmTransaction({ signature: txSignature, ...latest }, 'confirmed');
       setSignature(txSignature);
