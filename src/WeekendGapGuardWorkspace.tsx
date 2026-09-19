@@ -1,16 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Activity,
   AlertTriangle,
   ArrowRight,
-  CircleHelp,
-  Eye,
-  LayoutDashboard,
-  ListChecks,
-  RefreshCw,
-  ShieldAlert,
-  ShieldCheck,
-  Wallet,
+  Bell,
+  House,
+  Layers3,
+  Shield,
+  WalletCards,
   Zap,
 } from 'lucide-react';
 import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
@@ -311,175 +307,149 @@ export default function WeekendGapGuardWorkspace() {
 
   if (!authenticated) {
     return (
-      <div className="sp-dapp min-h-screen grid place-items-center px-4 py-8 sm:px-6">
-        <div className="w-full max-w-md rounded-[28px] border border-sp-border bg-white p-6 shadow-[0_20px_60px_rgba(16,24,40,.08)] sm:p-8">
-          <div className="flex items-center gap-3">
-            <div className="grid size-11 place-items-center rounded-2xl bg-[#101828] text-xs font-bold text-white shadow-sm">SP</div>
+      <div className="sp-dapp-auth">
+        <div className="sp-auth-card">
+          <div className="sp-brand-lockup">
+            <div className="sp-brand-mark">SP</div>
             <div>
-              <div className="text-sm font-bold tracking-[.12em] text-slate-100">STOCKPASS</div>
-              <div className="mt-1 font-mono text-[8px] uppercase tracking-[.16em] text-slate-500">Weekend Gap Guard</div>
+              <div className="sp-brand-name">StockPass</div>
+              <div className="sp-brand-sub"><span /> Solana mainnet</div>
             </div>
           </div>
 
-          <div className="mt-8 rounded-2xl bg-[#f6f8ff] p-5">
-            <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[.14em] text-[#315efb]">
-              <span className="size-2 rounded-full bg-[#315efb]" /> Wallet verification
-            </div>
+          <div className="sp-auth-hero">
+            <div className="sp-eyebrow">Wallet verification</div>
             {authStatus === 'authenticating' ? (
               <>
-                <h1 className="mt-4 text-2xl font-bold tracking-[-.03em] text-slate-100">Verify your wallet</h1>
-                <p className="mt-2 text-sm leading-6 text-slate-500">Approve the StockPass signature request. No assets move during authentication.</p>
+                <h1 className="mt-3 text-[22px] font-extrabold tracking-[-.035em] text-ink">Verify your wallet</h1>
+                <p className="mt-2 text-[11px] leading-6 text-mute">Approve the StockPass signature request. No assets move during authentication.</p>
               </>
             ) : authStatus === 'error' ? (
               <>
-                <h1 className="mt-4 text-2xl font-bold tracking-[-.03em] text-slate-100">Signature required</h1>
-                <p className="mt-2 text-sm leading-6 text-rose-600">{authError}</p>
-                <button className="sp-primary mt-5 inline-flex h-11 items-center gap-2 px-4 text-sm font-semibold" onClick={() => void authenticateCurrentWallet()}>
-                  Sign to continue <ArrowRight size={15} />
+                <h1 className="mt-3 text-[22px] font-extrabold tracking-[-.035em] text-ink">Signature required</h1>
+                <p className="mt-2 text-[11px] leading-6 text-flag">{authError}</p>
+                <button className="sp-button-brand mt-4" onClick={() => void authenticateCurrentWallet()}>
+                  Sign to continue <ArrowRight size={14} />
                 </button>
               </>
             ) : (
               <>
-                <h1 className="mt-4 text-2xl font-bold tracking-[-.03em] text-slate-100">Wallet connected</h1>
-                <p className="mt-2 text-sm leading-6 text-slate-500">Checking signed wallet ownership before opening your account.</p>
+                <h1 className="mt-3 text-[22px] font-extrabold tracking-[-.035em] text-ink">Wallet connected</h1>
+                <p className="mt-2 text-[11px] leading-6 text-mute">Checking signed wallet ownership before opening your account.</p>
               </>
             )}
           </div>
 
-          <div className="mt-6 grid grid-cols-3 gap-2">
-            <div className="rounded-2xl border border-sp-border bg-white p-3"><div className="font-mono text-[8px] uppercase tracking-[.12em] text-slate-500">Network</div><div className="mt-2 text-[10px] font-semibold text-slate-200">Solana</div></div>
-            <div className="rounded-2xl border border-sp-border bg-white p-3"><div className="font-mono text-[8px] uppercase tracking-[.12em] text-slate-500">Source</div><div className="mt-2 text-[10px] font-semibold text-slate-200">Kamino</div></div>
-            <div className="rounded-2xl border border-sp-border bg-white p-3"><div className="font-mono text-[8px] uppercase tracking-[.12em] text-slate-500">Custody</div><div className="mt-2 text-[10px] font-semibold text-slate-200">None</div></div>
+          <div className="sp-auth-grid">
+            <div className="sp-auth-stat"><div className="sp-label">Network</div><strong>Solana</strong></div>
+            <div className="sp-auth-stat"><div className="sp-label">Position</div><strong>Kamino</strong></div>
+            <div className="sp-auth-stat"><div className="sp-label">Custody</div><strong>None</strong></div>
           </div>
-
-          <div className="mt-6 font-mono text-[8px] uppercase tracking-[.12em] text-slate-400">Mainnet data · wallet-signed actions · non-custodial</div>
+          <div className="mt-4 text-center font-mono text-[8px] uppercase tracking-[.11em] text-faint">Mainnet data · wallet-signed actions · non-custodial</div>
         </div>
       </div>
     );
   }
 
-  const page: Page = route === '/app/positions' ? 'positions' : route === '/app/risk' ? 'risk' : route === '/app/actions' ? 'actions' : route === '/app/monitoring' ? 'monitoring' : 'dashboard';
-  const nav: Array<{ id: Page; label: string; hint: string }> = [
-    { id: 'dashboard', label: 'Home', hint: 'Account overview' },
-    { id: 'positions', label: 'Positions', hint: 'Kamino collateral' },
-    { id: 'risk', label: 'Guard', hint: 'Weekend protection' },
-    { id: 'actions', label: 'Actions', hint: 'Kamino execution' },
-    { id: 'monitoring', label: 'Monitor', hint: 'Alerts & sync' },
+  const page: Page =
+    route === '/app/positions' ? 'positions'
+      : route === '/app/risk' ? 'risk'
+        : route === '/app/actions' ? 'actions'
+          : route === '/app/monitoring' ? 'monitoring'
+            : 'dashboard';
+
+  const nav: Array<{ id: Page; label: string }> = [
+    { id: 'dashboard', label: 'Home' },
+    { id: 'positions', label: 'Positions' },
+    { id: 'actions', label: 'Actions' },
+    { id: 'risk', label: 'Guard' },
+    { id: 'monitoring', label: 'Monitor' },
   ];
   const routeFor = (id: Page) => id === 'dashboard' ? '/app' : '/app/' + id;
-  const pageTitle = nav.find((item) => item.id === page)?.label ?? 'Home';
 
   return (
-    <div className="sp-dapp min-h-screen">
-      <div className="min-h-screen lg:flex">
-        <aside className="sp-sidebar hidden w-[248px] shrink-0 lg:flex lg:flex-col">
-          <div className="sp-sidebar-brand flex h-[76px] items-center gap-3 px-5">
-            <div className="grid size-11 place-items-center rounded-2xl bg-[#101828] text-[11px] font-bold text-white">SP</div>
+    <div className="sp-dapp">
+      <header className="sp-topbar">
+        <div className="sp-topbar-inner">
+          <button onClick={() => navigate('/app')} className="sp-brand-lockup border-0 bg-transparent p-0 text-left">
+            <div className="sp-brand-mark">SP</div>
             <div className="min-w-0">
-              <div className="text-[12px] font-bold tracking-[.14em] text-slate-100">STOCKPASS</div>
-              <div className="mt-1 truncate font-mono text-[8px] uppercase tracking-[.15em] text-slate-500">Weekend Gap Guard</div>
+              <div className="sp-brand-name">StockPass</div>
+              <div className="sp-brand-sub"><span /> Solana mainnet</div>
             </div>
+          </button>
+
+          <div className="sp-header-actions">
+            <div className="sp-network-button"><span /> Solana mainnet</div>
+            <button onClick={() => navigate('/app/monitoring')} className="sp-icon-button relative" aria-label="Open monitoring">
+              <Bell size={16} />
+              {(counts.flagged > 0 || counts.watch > 0) && <span className="sp-alert-dot" />}
+            </button>
+            <button className="sp-wallet-button" title={address ?? 'Wallet'}>
+              <span className="sp-wallet-badge"><WalletCards size={12} /></span>
+              <span className="num">{address ? address.slice(0, 5) + '…' + address.slice(-5) : '—'}</span>
+            </button>
           </div>
-
-          <div className="flex-1 overflow-y-auto px-3 py-5">
-            <div className="px-3 pb-2 text-[9px] font-semibold uppercase tracking-[.14em] text-slate-400">Workspace</div>
-            <nav className="space-y-1.5">
-              {nav.map((item) => {
-                const active = page === item.id;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => navigate(routeFor(item.id))}
-                    className={'sp-nav-item group flex w-full items-center gap-3 px-3 py-3 text-left ' + (active ? 'sp-active' : '')}
-                  >
-                    <span className={active ? 'text-sp-blue' : 'text-slate-400'}>{navIcon(item.id)}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[12px] font-semibold">{item.label}</span>
-                      <span className="mt-0.5 block text-[9px] text-slate-500">{item.hint}</span>
-                    </span>
-                    {active && <span className="size-1.5 rounded-full bg-sp-blue" />}
-                  </button>
-                );
-              })}
-            </nav>
-
-            <div className="mt-8 rounded-2xl border border-sp-border bg-[#f8faff] p-4">
-              <div className="flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[.13em] text-slate-500">
-                <span className="size-2 rounded-full bg-emerald-500" /> Mainnet live
-              </div>
-              <div className="mt-4 space-y-2 text-[10px]">
-                <div className="flex justify-between"><span className="text-slate-500">Protocol</span><span className="font-semibold text-slate-200">Kamino</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Market</span><span className="font-semibold text-slate-200">xStocks</span></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-sp-border p-4">
-            <div className="sp-wallet-chip flex items-center gap-3 px-3 py-3">
-              <span className="grid size-8 place-items-center rounded-xl bg-[#eef3ff] text-sp-blue"><Wallet size={15} /></span>
-              <div className="min-w-0 flex-1">
-                <div className="font-mono text-[8px] uppercase tracking-[.12em] text-slate-500">Connected wallet</div>
-                <div className="sp-num mt-1 truncate text-[9px] text-slate-200">{address}</div>
-              </div>
-            </div>
-          </div>
-        </aside>
-
-        <div className="min-w-0 flex-1">
-          <header className="sp-topbar sticky top-0 z-30">
-            <div className="mx-auto flex h-[72px] max-w-[1240px] items-center justify-between gap-3 px-4 md:px-7">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="grid size-10 shrink-0 place-items-center rounded-2xl bg-[#101828] text-[10px] font-bold text-white lg:hidden">SP</div>
-                <div className="min-w-0">
-                  <div className="hidden font-mono text-[8px] uppercase tracking-[.15em] text-slate-400 sm:block">StockPass</div>
-                  <div className="truncate text-[15px] font-bold tracking-[-.02em] text-slate-100">{pageTitle}</div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="sp-network-chip hidden items-center gap-2 px-3 py-2 text-[9px] font-semibold uppercase tracking-[.08em] md:flex">
-                  <span className="size-1.5 rounded-full bg-emerald-500" /> Solana mainnet
-                </div>
-                <button onClick={() => void scan()} disabled={loading} className="sp-refresh inline-flex size-10 items-center justify-center" aria-label="Refresh mainnet state">
-                  <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-                </button>
-                <div className="sp-wallet-chip hidden items-center gap-2 px-3 py-2 sm:flex">
-                  <Wallet size={14} className="text-sp-blue" />
-                  <span className="sp-num max-w-32 truncate text-[9px] text-slate-300">{address?.slice(0, 5)}…{address?.slice(-5)}</span>
-                </div>
-              </div>
-            </div>
-          </header>
-
-          <main className="mx-auto min-h-[calc(100vh-72px)] max-w-[1240px] px-4 pb-28 md:px-7 md:pb-10">
-            {page === 'dashboard' && <WggDashboard address={address ?? null} positions={positions} rows={rows} counts={counts} loading={loading} preparing={preparing} authenticating={authenticating} signing={signing} prepared={prepared} signature={signature} error={error} lastLoaded={lastLoaded} scan={scan} prepareFix={prepareFix} signAndSendPrepared={signAndSendPrepared} />}
-            {page === 'positions' && <WggPositionsPage positions={positions} rows={rows} loading={loading} lastLoaded={lastLoaded} scan={scan} />}
-            {page === 'risk' && <WggRiskPage rows={rows} counts={counts} prepareFix={prepareFix} preparing={preparing} authenticating={authenticating} />}
-            {page === 'actions' && <WggActionsPage address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
-            {page === 'monitoring' && <WggMonitoringPage address={address ?? ''} />}
-
-            <footer className="mt-10 flex flex-col gap-2 border-t border-sp-border py-6 text-[9px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-              <div className="font-mono uppercase tracking-[.12em]">StockPass · Weekend Gap Guard</div>
-              <div className="flex items-center gap-4 font-mono uppercase tracking-[.1em]">
-                <span className="inline-flex items-center gap-1.5"><CircleHelp size={11} /> No demo balances</span>
-                <span className="inline-flex items-center gap-1.5"><ShieldCheck size={11} /> Wallet signed</span>
-              </div>
-            </footer>
-          </main>
-
-          <nav className="sp-bottom-nav fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 lg:hidden">
-            {nav.map((item) => {
-              const active = page === item.id;
-              return (
-                <button key={item.id} onClick={() => navigate(routeFor(item.id))} className={'sp-bottom-item flex flex-col items-center justify-center gap-1 text-[9px] font-semibold ' + (active ? 'sp-active' : '')}>
-                  {navIcon(item.id)}
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
-          </nav>
         </div>
-      </div>
+      </header>
+
+      <main className="sp-main">
+        {page === 'dashboard' && (
+          <WggDashboard
+            address={address ?? null}
+            positions={positions}
+            rows={rows}
+            counts={counts}
+            loading={loading}
+            preparing={preparing}
+            authenticating={authenticating}
+            signing={signing}
+            prepared={prepared}
+            signature={signature}
+            error={error}
+            lastLoaded={lastLoaded}
+            scan={scan}
+            prepareFix={prepareFix}
+            signAndSendPrepared={signAndSendPrepared}
+          />
+        )}
+        {page === 'positions' && <WggPositionsPage positions={positions} rows={rows} loading={loading} lastLoaded={lastLoaded} scan={scan} />}
+        {page === 'risk' && <WggRiskPage rows={rows} counts={counts} prepareFix={prepareFix} preparing={preparing} authenticating={authenticating} />}
+        {page === 'actions' && <WggActionsPage address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
+        {page === 'monitoring' && <WggMonitoringPage address={address ?? ''} />}
+
+        <div className="mt-7 grid grid-cols-3 gap-2 pb-2">
+          <div className="sp-provenance"><div><span>Position</span><strong>Kamino</strong></div></div>
+          <div className="sp-provenance"><div><span>Price</span><strong>xStocks</strong></div></div>
+          <div className="sp-provenance"><div><span>Scenario</span><strong>Twelve Data</strong></div></div>
+        </div>
+        {error && <div className="sp-alert-card sp-alert-danger mt-3"><AlertTriangle size={15} /><div className="sp-alert-copy">{error}</div></div>}
+      </main>
+
+      <nav className="sp-bottom-nav" aria-label="StockPass navigation">
+        {nav.map((item) => {
+          const active = page === item.id;
+          if (item.id === 'actions') {
+            return (
+              <button key={item.id} onClick={() => navigate(routeFor(item.id))} className="flex flex-col items-center justify-end gap-1 border-0 bg-transparent pb-0">
+                <span className="sp-bottom-action"><Zap size={21} /></span>
+                <span className={'sp-bottom-action-label text-[9px] font-semibold ' + (active ? 'text-brand' : '')}>Actions</span>
+              </button>
+            );
+          }
+          const Icon = item.id === 'dashboard' ? House : item.id === 'positions' ? Layers3 : item.id === 'risk' ? Shield : Bell;
+          return (
+            <button
+              key={item.id}
+              onClick={() => navigate(routeFor(item.id))}
+              className={'sp-bottom-item ' + (active ? 'sp-bottom-active' : '')}
+            >
+              <Icon size={19} strokeWidth={active ? 2.1 : 1.8} />
+              <span>{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </div>
   );
 }
