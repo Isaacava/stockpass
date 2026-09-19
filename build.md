@@ -8,7 +8,7 @@
 - TypeScript is restricted to the live WGG source dependency graph instead of checking the legacy StockPass UI tree.
 - The protection workspace compile error from the duplicate `targetLtvPct` declaration is fixed.
 - Repay preparation no longer depends on a browser Pyth price for its amount; the Vercel endpoint recalculates the repay amount from fresh Kamino debt state, live debt-reserve oracle price and mint decimals.
-- Vercel has not yet reported a READY deployment after these changes, so end-to-end completion is still gated on build verification and one real wallet-authenticated prepare/sign smoke test.
+- GitHub Actions now passes dependency installation, `tsc --noEmit --pretty false`, and the WASM production build.\n- Vercel reports the corrected WGG deployment as READY, and its deployment root returns HTTP 200.\n- The browser signer bridge now uses a local minimal wallet-provider interface, has no duplicate React hook imports, and reconstructs `TransactionInstruction.data` using the `Buffer` shape required by the installed Solana web3 types.\n- The remaining gate is runtime verification: production Pyth configuration plus one real wallet-authenticated protection-prepare/sign/submit smoke test.
 
 # Weekend Gap Guard build log
 
