@@ -30,7 +30,7 @@ function RiskBadge({ status }: { status?: 'safe' | 'watch' | 'flagged' | null })
     flagged: ['Flagged', 'bg-flag-soft text-flag', ShieldAlert],
   }[status];
   const Icon = meta[2];
-  return <span className={'sp-status ' + meta[1]}><span className="size-1.5 rounded-full " + (status === 'safe' ? 'bg-safe' : status === 'watch' ? 'bg-watch' : 'bg-flag')} /><Icon size={12} />{meta[0]}</span>;
+  return <span className={'sp-status ' + meta[1]}><span className={'size-1.5 rounded-full ' + (status === 'safe' ? 'bg-safe' : status === 'watch' ? 'bg-watch' : 'bg-flag')} /><Icon size={12} />{meta[0]}</span>;
 }
 
 export default function WggPositionsPage({
