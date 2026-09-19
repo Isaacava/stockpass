@@ -1,19 +1,11 @@
 import { createClient } from '@supabase/supabase-js';
 import { address, createNoopSigner, createSolanaRpc } from '@solana/kit';
-import {
-  KaminoAction,
-  KaminoMarket,
-  PROGRAM_ID,
-  VanillaObligation,
-  getCurrentLedgerInstant,
-  getMedianSlotDurationInMsFromLastEpochs,
-} from '@kamino-finance/klend-sdk';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const MAINNET_RPC = process.env.SOLANA_RPC_URL || '';
 const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
-const KAMINO_PROGRAM_ID = String(PROGRAM_ID);
+const KAMINO_PROGRAM_ID = 'KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD';
 
 const ACTIONS = new Set(['supply', 'deposit', 'borrow', 'repay', 'withdraw', 'close']);
 
@@ -67,6 +59,18 @@ export default async function handler(req: any, res: any) {
   if (!SUPABASE_SERVICE_ROLE_KEY) return json(res, { error: 'SUPABASE_SERVICE_ROLE_KEY is not configured.' }, 503);
 
   try {
+    // Keep the heavy Kamino action module inside the request boundary. If a
+    // transitive ESM/runtime dependency is unavailable on Vercel, return the
+    // underlying exception as JSON instead of crashing the whole invocation.
+    const {
+      KaminoAction,
+      KaminoMarket,
+      PROGRAM_ID,
+      VanillaObligation,
+      getCurrentLedgerInstant,
+      getMedianSlotDurationInMsFromLastEpochs,
+    } = await import('@kamino-finance/klend-sdk');
+
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     const wallet = typeof body.wallet === 'string' ? body.wallet.trim() : '';
     const actionType = typeof body.action === 'string' ? body.action : '';
