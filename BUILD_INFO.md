@@ -778,3 +778,26 @@ The StockPass public landing and authenticated WGG app are now separate routes.
 - Direct /app/* visits are rewritten to the SPA entry by Vercel while preserving the API function paths.
 - When wallet authentication is lost, the app returns to the public landing route; authenticated users entering / are moved to /app.
 - The Overview dashboard no longer embeds the full Positions and Actions pages.
+
+## Dashboard routing + Vercel build fix — 2026-09-19
+
+The connected product surface is now separated from the public landing page.
+
+Public:
+- `/` = StockPass landing / wallet-entry experience.
+
+Protected app routes:
+- `/app` = Dashboard / account command center
+- `/app/positions` = live Kamino xStock positions
+- `/app/risk` = Weekend Gap Guard risk analysis
+- `/app/actions` = Kamino borrow/supply/deposit/repay/withdraw/close execution console
+- `/app/monitoring` = authenticated monitoring sync and alert check
+
+The app uses lightweight browser-history routing rather than adding another router dependency. Vercel rewrites `/app/*` back to the Vite entry while preserving the browser pathname, so each dashboard page remains a distinct URL/page state.
+
+The Vercel build failure from commit `d2def876b69ef7acdbbbb94502fa988a8bc22ff0` was identified from the build log as:
+`src/WeekendGapGuardWorkspace.tsx(278,9): Type 'string | undefined' is not assignable to type 'string | null'.`
+
+The affected `WggDashboard` prop is now passed as `address ?? null`. The large npm ERESOLVE output in that log was peer-dependency warnings; the command actually stopped on the TypeScript error above.
+
+A fresh local TypeScript build could not be executed in the current tooling environment because outbound GitHub DNS resolution is unavailable. The source-side TypeScript error has been corrected, but the next Vercel build remains the authoritative compile verification.
