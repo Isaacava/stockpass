@@ -256,6 +256,7 @@ export default function WeekendGapGuardWorkspace() {
         {!loading && positions.length > 0 && <div className="wgg-position-list">{positions.map((position) => {
           const leadSymbol = position.xStocks[0]?.symbol;
           const leadGap = leadSymbol ? weekendGaps[leadSymbol] : undefined;
+          const positionRisk = rows.find((row) => row.position.obligation === position.obligation)?.risk;
           return <article className="wgg-position-card" key={position.obligation}>
             <div className="wgg-position-head"><div><span className="wgg-position-label">OBLIGATION</span><strong>{position.obligation.slice(0, 6)}…{position.obligation.slice(-6)}</strong></div><span className="wgg-ltv">LTV {position.ltvPct != null ? `${position.ltvPct.toFixed(2)}%` : '—'}</span></div>
             <div className="wgg-xstock-list">{position.xStocks.map((stock) => {
@@ -270,7 +271,7 @@ export default function WeekendGapGuardWorkspace() {
   </button>}
 </div>}</div>;
             })}</div>
-            <div className="wgg-position-metrics"><div><span>Liquidation LTV</span><strong>{position.liquidationLtvPct != null ? `${position.liquidationLtvPct.toFixed(2)}%` : '—'}</strong></div><div><span>Stressed LTV</span><strong>{rows.find((row) => row.position.obligation === position.obligation)?.risk?.stressedLtvPct != null ? `${rows.find((row) => row.position.obligation === position.obligation)?.risk?.stressedLtvPct.toFixed(2)}%` : '—'}</strong></div><div><span>Distance to liquidation</span><strong>{rows.find((row) => row.position.obligation === position.obligation)?.risk?.liquidationDistancePct != null ? `${rows.find((row) => row.position.obligation === position.obligation)?.risk?.liquidationDistancePct.toFixed(2)} pts` : '—'}</strong></div><div><span>Borrow value</span><strong>{position.borrowValueUsd != null ? `$${position.borrowValueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</strong></div></div>
+            <div className="wgg-position-metrics"><div><span>Liquidation LTV</span><strong>{position.liquidationLtvPct != null ? `${position.liquidationLtvPct.toFixed(2)}%` : '—'}</strong></div><div><span>Stressed LTV</span><strong>{positionRisk?.stressedLtvPct != null ? `${positionRisk.stressedLtvPct.toFixed(2)}%` : '—'}</strong></div><div><span>Distance to liquidation</span><strong>{positionRisk?.liquidationDistancePct != null ? `${positionRisk.liquidationDistancePct.toFixed(2)} pts` : '—'}</strong></div><div><span>Borrow value</span><strong>{position.borrowValueUsd != null ? `${position.borrowValueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</strong></div></div>
           </article>;
         })}</div>}
       </section>}
