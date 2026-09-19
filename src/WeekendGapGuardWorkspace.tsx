@@ -3,7 +3,7 @@ import { AlertTriangle, ArrowRight, Bell, CircleHelp, Gauge, LoaderCircle, Shiel
 import { useAppKitAccount, useAppKitProvider } from '@reown/appkit/react';
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import type { KaminoXStockPosition } from './lib/kamino';
-import KaminoActionConsole from './KaminoActionConsole';
+import WggMonitoringPage from './WggMonitoringPage';
 import WggDashboard from './WggDashboard';
 import WggPositionsPage from './WggPositionsPage';
 import WggRiskPage from './WggRiskPage';
@@ -282,7 +282,7 @@ export default function WeekendGapGuardWorkspace() {
     </div>;
   }
 
-  const page = route === '/app/positions' ? 'positions' : route === '/app/risk' ? 'risk' : route === '/app/actions' ? 'actions' : 'dashboard';
+  const page = route === '/app/positions' ? 'positions' : route === '/app/risk' ? 'risk' : route === '/app/actions' ? 'actions' : route === '/app/monitoring' ? 'monitoring' : 'dashboard';
 
   return <div className="wgg-app">
     <header className="wgg-header sp-app-header">
@@ -295,6 +295,7 @@ export default function WeekendGapGuardWorkspace() {
         <button className={page === 'positions' ? 'is-active' : ''} onClick={() => navigate('/app/positions')}>Positions</button>
         <button className={page === 'risk' ? 'is-active' : ''} onClick={() => navigate('/app/risk')}>Guard</button>
         <button className={page === 'actions' ? 'is-active' : ''} onClick={() => navigate('/app/actions')}>Actions</button>
+        <button className={page === 'monitoring' ? 'is-active' : ''} onClick={() => navigate('/app/monitoring')}>Monitoring</button>
       </nav>
       <div className="wgg-header-right">
         <span className="wgg-mainnet"><i /> SOLANA MAINNET</span>
@@ -304,7 +305,7 @@ export default function WeekendGapGuardWorkspace() {
 
     <main className="wgg-main sp-main">
       {page === 'dashboard' && <WggDashboard
-        address={address}
+        address={address ?? null}
         positions={positions}
         rows={rows}
         counts={counts}
@@ -326,6 +327,8 @@ export default function WeekendGapGuardWorkspace() {
       {page === 'risk' && <WggRiskPage rows={rows} counts={counts} prepareFix={prepareFix} preparing={preparing} authenticating={authenticating} />}
 
       {page === 'actions' && <WggActionsPage address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
+
+      {page === 'monitoring' && <WggMonitoringPage address={address ?? ''} />}
 
       <footer className="wgg-footer">
         <span>StockPass / Weekend Gap Guard</span>
