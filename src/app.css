@@ -64,12 +64,25 @@
 .sp-dapp .sp-panel {
   background: var(--sp-panel);
   border-color: var(--sp-border);
+  border-radius: 22px;
+  box-shadow: 0 8px 30px rgba(16,24,40,.045);
 }
 
 .sp-dapp .bg-sp-panel-2,
 .sp-dapp .sp-panel-2 {
   background: var(--sp-panel-2);
   border-color: var(--sp-border);
+  border-radius: 16px;
+}
+
+.sp-dapp [class~="bg-sp-panel"] {
+  background: #fff !important;
+  color: #101828;
+}
+
+.sp-dapp [class~="bg-sp-panel-2"] {
+  background: #f8faff !important;
+  color: #101828;
 }
 
 .sp-dapp .border-sp-border { border-color: var(--sp-border) !important; }
