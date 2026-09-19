@@ -23,6 +23,10 @@
   "include": [
     "src/main.tsx",
     "src/WeekendGapGuardWorkspace.tsx",
+    "src/WggDashboard.tsx",
+    "src/WggPositionsPage.tsx",
+    "src/WggRiskPage.tsx",
+    "src/WggActionsPage.tsx",
     "src/reown.ts",
     "src/reown-hardcoded.ts",
     "src/lib/assets.ts",
