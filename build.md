@@ -916,3 +916,70 @@ When continuing this project from this file:
 6. Keep Twelve Data isolated to historical risk-model data.
 7. Update this file after every major implementation milestone.
 8. Record actual verification results, not intended behavior.
+
+
+## xStocks + Twelve Data implementation milestone — 2026-09-19
+
+The active WGG workspace has now been refactored away from Pyth for its runtime market-data path.
+
+### Added
+
+- `api/wgg-market-data.ts`
+  - server-side xStocks current-price adapter
+  - server-side xStocks multiplier lookup
+  - server-side Twelve Data daily OHLC adapter
+  - strict symbol normalization to official xStock-style symbols
+  - 13-week weekend-gap calculation with a calendar buffer
+  - next-valid-session logic instead of blindly assuming Monday
+  - minimum historical-sample validation
+  - provider/provenance metadata
+  - short-lived server cache for current prices
+  - 30-minute server cache for historical datasets
+  - explicit unavailable responses instead of fabricated risk data
+  - Twelve Data API key remains server-side
+- `src/lib/wggMarketData.ts`
+  - browser client for the unified WGG market-data endpoint
+  - typed xStocks current-price response
+  - typed Twelve Data weekend-gap summary
+- `src/WeekendGapGuardWorkspace.tsx`
+  - no longer calls `fetchPythPrices()`
+  - no longer calls the legacy Pyth weekend-gap function
+  - requests official xStock symbols such as `AAPLx`/ `NVDAx`
+  - displays xStocks as the current-price source
+  - displays explicit historical-data errors/unavailable states
+  - protection amount planning now uses the xStocks current price returned by the new server adapter
+- `tsconfig.json`
+  - includes `src/lib/wggMarketData.ts` in the live WGG typecheck graph
+
+### Data flow now
+
+`Kamino obligation → official xStock symbol → xStocks current price → Twelve Data underlying ticker history → weekend-gap statistics → WGG risk engine`
+
+The historical provider is isolated to the risk model. It never supplies token balances, collateral amounts, Kamino debt, or ownership state.
+
+### Research verified
+
+Current xStocks documentation states that public endpoints provide asset price data and multiplier data; Solana xStocks use Token-2022 with raw balances plus multiplier-driven displayed values. The public price-data endpoint is the intended current xStock pricing source.
+
+Current Twelve Data documentation supports daily `/time_series` OHLC data, historical `start_date`/`end_date` ranges, and batched symbol queries. The current Basic plan advertises 800 API credits/day; batched symbols still consume credits per symbol.
+
+### Important implementation note
+
+The current adapter uses an in-memory server cache. This is suitable as the first runtime implementation, but a durable shared historical cache should be added before scaling the monitoring worker across many users.
+
+### Current code commits
+
+- `0cb4c1fa8205a49e0634b2b1219a01cfe2e47ccd` — server market-data API
+- `842248f48e4bd8e752c402dc9b1d4dda995e58bf` — browser market-data client
+- `e273bcf07e6f32d36150b108af164e987ba79585` — dependency-free Vercel API typing
+- `bbde2757e7b473aede4fc098e08a0ef1fa353caa` — workspace Pyth-to-market-data refactor
+- `5f60b5c20f8cc90ff9e3ebb1438ff5ba6c99e0bf` — official xStock symbol keying fix
+- `49dcc383049e96a32dd6e516536ae7da726818f0` — xStock symbol normalization
+- `8d7ed8b13587b9be374376870791ad523c36159a` — include market-data client in typecheck
+
+Next verification gate:
+1. Confirm the repository build/typecheck is green.
+2. Configure `TWELVE_DATA_API_KEY` server-side.
+3. Test the market-data endpoint with real xStock symbols.
+4. Verify the 13-week samples and resulting WGG risk states.
+5. Remove/archive the dormant Pyth adapters after runtime verification.
