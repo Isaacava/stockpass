@@ -1,3 +1,5 @@
+import { discoverKaminoXStockPositions } from '../src/lib/kamino';
+
 const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 import { evaluateEarningsRisk, type EarningsEvent } from '../src/lib/wggEarnings';
 import {
@@ -387,7 +389,6 @@ async function syncWallet(wallet: string, runKind: 'manual' | 'friday' | 'positi
   if (runError) throw runError;
 
   try {
-    const { discoverKaminoXStockPositions } = await import('../src/lib/kamino');
     const positions = await discoverKaminoXStockPositions(wallet, SOLANA_RPC_URL);
     const symbols = Array.from(new Set(positions.flatMap((position) => position.xStocks.map((stock) => stock.symbol))));
     const priceData = await fetchXStockData(symbols);
