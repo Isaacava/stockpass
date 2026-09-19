@@ -884,3 +884,42 @@ The latest source commit before this documentation change is 9913e1f69cda690c233
 Vercel build `dpl_9FdQB8hPSRZVqtproxSbqXCsQ4mk` stopped at TypeScript compilation in `src/WggMonitoringPage.tsx`. The npm `ERESOLVE` output was peer-dependency warnings; the fatal errors were caused by an untyped array containing Lucide icon components being rendered as `ReactNode`.
 
 Fixed by typing the monitoring pipeline metadata as `[LucideIcon, string, string][]` and importing the `LucideIcon` type. Fix commit: `86b2965cff371dee78c1f219e05aeb4667a8da0f`.
+
+
+## Prototype-faithful wallet frontend milestone — 2026-09-19
+
+The authenticated Weekend Gap Guard frontend has been rebuilt against the supplied StockPass interactive HTML reference. This is a production reskin/restructure, not a mock-data port.
+
+### Frontend changes
+
+- `src/WeekendGapGuardWorkspace.tsx`
+  - replaced the previous sidebar-heavy authenticated shell with the reference's compact wallet header and persistent five-route mobile-first bottom navigation;
+  - kept the existing browser-history routes: `/app`, `/app/positions`, `/app/actions`, `/app/risk`, `/app/monitoring`;
+  - kept wallet authentication, mainnet scan, WGG calculations and preparation/signing logic intact.
+- `src/WggDashboard.tsx`
+  - implemented the reference protection hero, real LTV/stressed/Liquidation values, real risk filter chips, tappable real position rows with detail sheet, real next-action protection controls, and provenance strip.
+- `src/WggPositionsPage.tsx`
+  - implemented the full live row-based positions surface with real rescan, liquidation gauge, and xStocks/Twelve Data market context.
+- `src/WggRiskPage.tsx`
+  - implemented per-position real risk gauges and Safe/Watch/Flagged counts/actions.
+- `src/KaminoActionConsole.tsx`
+  - kept the real Kamino prepare -> wallet-sign -> mainnet-confirm -> server-verify path while changing only the visual/component layer;
+  - action chips, position/reserve selection, real position-derived quick fills, review state and confirmed state now follow the reference interaction model.
+- `src/WggMonitoringPage.tsx`
+  - now reads persisted `wgg_check_runs`, `wgg_monitored_positions`, `wgg_alerts`, and Telegram-link state through the authenticated monitoring route;
+  - manual Run Check still calls the existing trusted `api/wgg-monitor.ts` sync.
+- `src/app.css`
+  - replaced the prior mixed dashboard styling with the reference token system: canvas/surface/soft/line/ink/mute/faint, brand/safe/watch/flag states, Inter + JetBrains Mono, wallet cards, sheets, chips, gauges, and five-tab nav;
+  - the Solana gradient is used only for the brand mark and raised Actions button.
+- `src/config.ts` + `src/vite-env.d.ts`
+  - centralized Telegram frontend configuration with manual value first and Vite/Vercel fallback.
+- `api/wgg-monitor.ts`
+  - added an authenticated read-only `mode: "state"` branch so the frontend can display real persisted monitoring state without bypassing the custom wallet-session boundary.
+
+### Data integrity
+
+No fake balances, fake risk readings, fake alerts, simulated timers, simulated confirmations, automatic liquidation, custody, or private-key handling were added. Kamino remains the position source of truth; xStocks remains the current-price source; Twelve Data remains historical weekend-gap context.
+
+### Verification state
+
+Source-level review was completed after the redesign. Local production build execution is still constrained by the current runtime's inability to resolve GitHub DNS / fetch a repository checkout. Vercel/GitHub CI status for the latest `main` commits remains the final build gate and must be checked before describing the deployment as READY.
