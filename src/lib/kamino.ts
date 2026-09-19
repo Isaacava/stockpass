@@ -1,5 +1,3 @@
-import { address, createSolanaRpc } from '@solana/kit';
-import { KaminoMarket, getCurrentLedgerInstant, getMedianSlotDurationInMsFromLastEpochs } from '@kamino-finance/klend-sdk';
 import { SERVER_STOCKS } from './serverAssets';
 import { resolveOfficialStocks } from './xstocks';
 
@@ -93,6 +91,13 @@ function reserveLiquidationLtvPct(reserve: unknown) {
  */
 export async function discoverKaminoXStockPositions(wallet: string, rpcUrl: string): Promise<KaminoXStockPosition[]> {
   if (!wallet) return [];
+
+  const { address, createSolanaRpc } = await import('@solana/kit');
+  const {
+    KaminoMarket,
+    getCurrentLedgerInstant,
+    getMedianSlotDurationInMsFromLastEpochs,
+  } = await import('@kamino-finance/klend-sdk');
 
   const officialAssets = await resolveOfficialStocks(SERVER_STOCKS);
   const xStockByMint = new Map(
