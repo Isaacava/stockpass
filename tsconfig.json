@@ -2,7 +2,11 @@
   "compilerOptions": {
     "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "allowJs": false,
     "skipLibCheck": true,
     "esModuleInterop": true,
@@ -16,6 +20,30 @@
     "noEmit": true,
     "jsx": "react-jsx"
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": [
+    "src/main.tsx",
+    "src/WeekendGapGuardWorkspace.tsx",
+    "src/reown.ts",
+    "src/reown-hardcoded.ts",
+    "src/lib/assets.ts",
+    "src/lib/kamino.ts",
+    "src/lib/pyth.ts",
+    "src/lib/supabase.ts",
+    "src/lib/walletAuth.ts",
+    "src/lib/walletSession.ts",
+    "src/lib/wggRisk.ts",
+    "src/lib/xstocks.ts"
+  ],
+  "references": [
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ],
+  "exclude": [
+    "src/StockPass*.tsx",
+    "src/*Social*.tsx",
+    "src/Profile*.tsx",
+    "src/MobileSocialBar.tsx",
+    "src/StockPass*.ts"
+  ]
 }
