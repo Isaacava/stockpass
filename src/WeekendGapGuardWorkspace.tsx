@@ -4,9 +4,8 @@ import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/re
 import type { Provider } from '@reown/appkit-adapter-solana';
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { discoverKaminoXStockPositions, type KaminoXStockPosition } from './lib/kamino';
-import { calculateCollateralUsdForTargetLtv, calculateRepayUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
+import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
 import { fetchPythPrices, fetchWeekendGapSummaries, type PythPriceMap, type WeekendGapMap } from './lib/pyth';
-import { supabase } from './lib/supabase';
 import { refreshWalletSession } from './lib/walletAuth';
 import { readWalletSessionToken } from './lib/walletSession';
 import './weekend-gap-guard.css';
@@ -19,6 +18,7 @@ type PreparedInstruction = {
   accounts: Array<{ address: string; signer: boolean; writable: boolean }>;
 };
 type Prepared = {
+  kind: 'deposit' | 'repay';
   symbol: string;
   amountBaseUnits: string;
   instructionCount: number;
@@ -97,19 +97,20 @@ export default function WeekendGapGuardWorkspace() {
   }
 
   async function prepareFix(row: Row, kind: 'deposit' | 'repay') {
-    if (!address || !row.price || !row.gap || row.position.liquidationLtvPct == null || row.position.liquidationBufferPct == null) return;
+    if (!address || !row.gap || row.position.liquidationLtvPct == null || row.position.liquidationBufferPct == null) return;
     const typicalGap = row.gap.typicalWeekendGapPct ?? 0;
     const risk = evaluateWeekendRisk({ currentBufferPct: row.position.liquidationBufferPct, typicalWeekendGapPct: typicalGap });
     if (risk.status !== 'flagged') return;
     const targetLtvPct = Math.max(1, row.position.liquidationLtvPct - risk.adjustedGapPct * 1.2);
-    const neededUsd = calculateCollateralUsdForTargetLtv(row.position.borrowValueUsd ?? 0, row.position.depositValueUsd ?? 0, targetLtvPct);
-    const tokenAmount = neededUsd / row.price.price;
-    const amountBaseUnits = kind === 'deposit'
-      ? BigInt(Math.ceil(tokenAmount * 10 ** row.stock.mintDecimals)).toString()
-      : '';
-    if (kind === 'deposit' && amountBaseUnits === '0') return;
+    let amountBaseUnits = '';
+    if (kind === 'deposit') {
+      if (!row.price) return;
+      const neededUsd = calculateCollateralUsdForTargetLtv(row.position.borrowValueUsd ?? 0, row.position.depositValueUsd ?? 0, targetLtvPct);
+      const tokenAmount = neededUsd / row.price.price;
+      amountBaseUnits = BigInt(Math.ceil(tokenAmount * 10 ** row.stock.mintDecimals)).toString();
+      if (amountBaseUnits === '0') return;
+    }
 
-    const targetLtvPct = Math.max(1, row.position.liquidationLtvPct - risk.adjustedGapPct * 1.2);
     setPreparing(true); setAuthenticating(true); setError(''); setPrepared(null); setSignature('');
     try {
       if (!walletProvider?.signMessage) throw new Error('Connected wallet does not support message signing.');
@@ -147,6 +148,7 @@ export default function WeekendGapGuardWorkspace() {
       if (!payload?.instructions?.length) throw new Error('Protection service returned no instructions.');
       if (kind === 'repay' && !data?.amountBaseUnits) throw new Error('Protection service returned no computed repay amount.');
       setPrepared({
+        kind,
         symbol: kind === 'repay' ? (row.position.debts[0]?.mint ?? 'Debt') : row.symbol,
         amountBaseUnits: data?.amountBaseUnits ?? amountBaseUnits,
         instructionCount: payload.instructions.length,
@@ -199,7 +201,7 @@ export default function WeekendGapGuardWorkspace() {
       {isConnected && <section className="wgg-dashboard">
         <div className="wgg-section-head"><div><div className="wgg-eyebrow">REAL KAMINO + PYTH DATA</div><h2>Your xStock-backed obligations.</h2><p>{lastLoaded ? `Mainnet scan completed ${lastLoaded.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.` : 'Scan the current Kamino Main Market to load real positions.'}</p></div><button className="wgg-secondary" onClick={() => void scan()} disabled={loading}><RefreshCw size={14} /> Refresh</button></div>
         {error && <div className="wgg-error"><AlertTriangle size={18} /><div><strong>Action unavailable</strong><span>{error}</span></div></div>}
-        {prepared && <div className="wgg-empty"><ShieldCheck size={21} /><strong>Protection action prepared</strong><span>{prepared.symbol} deposit · {prepared.amountBaseUnits} base units · {prepared.instructionCount} instructions. Review it in your wallet before approval.</span><button className="wgg-primary" onClick={() => void signAndSendPrepared()} disabled={signing}>{signing ? <><LoaderCircle size={14} className="wgg-spin" /> Waiting for wallet</> : <>Review & sign <ArrowRight size={14} /></>}</button>{signature && <span>Confirmed transaction: {signature}</span>}</div>}
+        {prepared && <div className="wgg-empty"><ShieldCheck size={21} /><strong>Protection action prepared</strong><span>{prepared.symbol} {prepared.kind} · {prepared.amountBaseUnits} base units · {prepared.instructionCount} instructions. Review it in your wallet before approval.</span><button className="wgg-primary" onClick={() => void signAndSendPrepared()} disabled={signing}>{signing ? <><LoaderCircle size={14} className="wgg-spin" /> Waiting for wallet</> : <>Review & sign <ArrowRight size={14} /></>}</button>{signature && <span>Confirmed transaction: {signature}</span>}</div>}
         {!loading && positions.length === 0 && <div className="wgg-empty"><AlertTriangle size={21} /><strong>No xStock-backed Kamino obligation found</strong><span>The scan completed against mainnet and no fake position was inserted.</span></div>}
         {loading && <div className="wgg-empty"><LoaderCircle size={21} className="wgg-spin" /><strong>Reading Kamino, Pyth and weekend history</strong><span>This is a read-only mainnet scan.</span></div>}
         {!loading && positions.length > 0 && <div className="wgg-position-list">{positions.map((position) => {
