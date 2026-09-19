@@ -503,6 +503,8 @@ Supabase hosts:
 - P75 downside-gap risk signal
 - first-pass SAFE/WATCH/FLAGGED risk engine
 - target-LTV action-planning helpers
+- fresh-state exact Kamino repay amount calculation
+- WGG deposit and repay preparation paths
 - wallet message-signature authentication
 - wallet session storage
 - protected wallet-session validation
@@ -524,7 +526,7 @@ Supabase hosts:
 - Configure Pyth API key
 - Verify live Pyth pricing
 - Verify historical weekend-gap responses
-- Add exact repay calculation using fresh debt-reserve pricing/decimals
+- Verify exact repay calculation using fresh debt-reserve oracle pricing/decimals
 - Add server-side earnings calendar adapter
 - Populate trusted wgg_monitored_positions
 - Build scheduled Friday monitoring
