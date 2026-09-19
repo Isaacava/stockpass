@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react';
+import { useAppKitAccount } from '@reown/appkit/react';
 import ReactDOM from 'react-dom/client';
 import './styles.css';
 import './mobile-safety.css';
@@ -42,6 +43,12 @@ function LandingGate({ onConnect, status, error }: { onConnect: () => void; stat
   </div>;
 }
 
+function ConnectedRoute({ connect }: { connect: () => void }) {
+  const { isConnected } = useAppKitAccount({ namespace: 'solana' });
+  if (!isConnected) return <LandingGate onConnect={connect} status="ready" error="" />;
+  return <Suspense fallback={<div className="wgg-auth-transition"><div className="wgg-auth-panel"><span className="wgg-gate-mark">SP</span><strong>Opening your risk workspace</strong><span>Loading the authenticated Solana workspace…</span></div></div>}><Workspace /></Suspense>;
+}
+
 function AppShell() {
   const [walletReady, setWalletReady] = useState(false);
   const [status, setStatus] = useState<'starting' | 'ready' | 'error'>('starting');
@@ -78,7 +85,7 @@ function AppShell() {
   };
 
   if (!walletReady) return <LandingGate onConnect={connect} status={status} error={error} />;
-  return <Suspense fallback={<LandingGate onConnect={connect} status="ready" error="" />}><Workspace /></Suspense>;
+  return <ConnectedRoute connect={connect} />;
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><AppErrorBoundary><AppShell /></AppErrorBoundary></React.StrictMode>);
