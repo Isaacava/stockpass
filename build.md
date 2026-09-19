@@ -1014,3 +1014,77 @@ This follows the current xStocks Solana integration guidance: raw balances are t
 - `b7174f262ce2ecfd33be6c78d3d4835c47b8e00d` — store prepared instruction set
 - `cb01ec2c0a44e15a904420c45630309ecc1f19c2` — xStocks multiplier-aware collateral planning
 - `33effd2dfb0daac8d4febd56c905aad5ddf20936` — market-data architecture checkpoint
+
+## Trusted WGG monitoring + Telegram milestone — 2026-09-19
+
+The remaining monitoring pipeline is now implemented end-to-end in code.
+
+### Monitoring worker
+
+`api/wgg-monitor.ts` is the trusted WGG check path.
+
+- Manual sync requires an authenticated StockPass wallet session.
+- Scheduled mode requires `CRON_SECRET`.
+- Reads the real Kamino Main Market again before evaluating risk.
+- Uses official xStocks current price + multiplier data.
+- Uses server-side Twelve Data daily OHLC for Friday-close → next valid trading-session-open history.
+- Uses Twelve Data earnings calendar as an optional near-term risk overlay when configured.
+- Upserts `wgg_monitored_positions`.
+- Marks previously observed positions stale when they disappear from fresh Kamino state.
+- Creates deduplicated `wgg_alerts`.
+- Records `wgg_check_runs`.
+- Sends newly created alerts to the Telegram worker.
+- Wallets are discovered from monitored positions and confirmed `wgg_platform_actions`.
+
+The browser now invokes a manual monitoring sync after a wallet scan, so connecting an existing Kamino xStock position also enrolls it into the trusted monitoring read-model.
+
+### Action provenance
+
+The flagged protection buttons now use the same `kamino-actions-prepare` → wallet signature → `kamino-actions-verify` path as the main Kamino control console.
+
+This means Add Collateral and Repay protection actions also receive:
+
+1. a server-created `wgg_platform_actions` record;
+2. fresh Kamino-state preparation;
+3. browser wallet review/signature;
+4. mainnet confirmation;
+5. exact prepared-instruction verification;
+6. monitoring refresh after confirmation.
+
+### Telegram
+
+- `api/wgg-telegram-link.ts` creates a short-lived, hashed one-time link challenge after wallet-session validation.
+- `telegram-webhook` consumes the one-time challenge and writes only the authenticated wallet/chat mapping to `wgg_telegram_links`.
+- `alerts-worker` now reads `wgg_alerts`, sends only unsent WGG alerts, and stamps `telegram_sent_at`.
+- Live Supabase Edge Functions `alerts-worker` and `telegram-webhook` are deployed.
+- The frontend exposes Connect Telegram only when `VITE_TELEGRAM_BOT_USERNAME` is configured.
+
+### Database
+
+Migration `0006_wgg_telegram_link_challenges.sql` is committed and has been applied to the live Supabase project. It adds one-time Telegram challenge storage and WGG alert indexes.
+
+### Environment gates still required
+
+- `SOLANA_RPC_URL` — authenticated dedicated mainnet RPC for Vercel server functions.
+- `VITE_SOLANA_RPC_URL` — authenticated dedicated mainnet RPC for browser reads/confirmation.
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only.
+- `TWELVE_DATA_API_KEY` — server-only historical/earnings provider.
+- `CRON_SECRET` — server-only protection for the scheduled monitoring route.
+- `TELEGRAM_BOT_TOKEN` — Supabase Edge Function secret.
+- `TELEGRAM_WEBHOOK_SECRET` — Supabase Edge Function secret.
+- `VITE_TELEGRAM_BOT_USERNAME` — public bot username for the frontend Telegram handoff.
+
+No Pyth key is required on the active WGG path.
+
+### Current verification status
+
+Code is committed through:
+- `4dd113128f9e25ae15268db9ec86e2ca8c101d7c` — Telegram UI handoff.
+- `5777473ad62ddd6f2ed0f4f7e097b99b3c56b13b` — restored complete WGG workspace + verified protection actions.
+- `fb6a9c3ff61f5eb891aae7f65a64a3c867a02afe` — Web Crypto Telegram-link API.
+- `194ccd38b6aed1a50e195b2fcef43e065e7e43c2` — scheduled WGG cron.
+- `1b173b69211a25f3281cbd48893b3fc6450f8eb0` — trusted monitoring worker.
+
+The live Supabase migration and both WGG Edge Functions are deployed.
+
+Remaining runtime gate: Vercel's automatic deployment queue must finish a green build, followed by a real wallet smoke test against a connected mainnet wallet. The external deployment fetch is currently SSO-protected, so anonymous HTTP cannot be used as the smoke test.
