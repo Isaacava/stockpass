@@ -43,8 +43,8 @@ Current-source verification was performed before implementation began.
 
 - Kamino's current TypeScript SDK is `@kamino-finance/klend-sdk`. The current package is published as 12.0.0 and documents `KaminoMarket` reads plus `KaminoAction` lending operations. The official repository and package should remain the source of truth for API changes.
 - Kamino's current mainnet Main Market address used by the SDK examples is `7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF`.
-- Pyth Core was upgraded on August 26, 2026. Current Hermes/Benchmarks requests require API-key authentication, and current historical Benchmarks queries are timestamp-based. The API key must stay server-side.
-- Pyth's current documentation distinguishes regular-session US equity feeds on Pyth Core from extended-hours equity feeds that moved to Pyth Pro. Weekend Gap Guard's risk model is designed around the requested regular-session close/open measurement rather than assuming every equity feed is 24/7 on Pyth Core.
+- Pyth was investigated as a possible market-data provider, but the current 14-day Pyth Pro demo key is not entitled to the required US-equity feeds (the authenticated NVDA test returned "Not entitled" for the NVDA equity feed). Pyth is therefore **deferred and is not the source of truth for WGG market data in the current architecture**.
+- The project instead uses xStocks-native public market/asset data for current xStock state and a separate historical OHLC provider for the 13-week weekend-gap model.
 - Nasdaq's public earnings calendar endpoint is a current candidate source for a server-side earnings adapter; the adapter must remain server-side and should treat missing/ambiguous calendar data as unavailable rather than infer a report date. Current public references document `https://api.nasdaq.com/api/calendar/earnings?date=YYYY-MM-DD`. citeturn508859search0turn508859search4
 - Surfpool is the planned local test environment for a fork of real Solana mainnet state so demo positions can be tested without real funds.
 - STOCKLANA is currently live on the Solana hackathon site and is the target hackathon for this build.
@@ -83,7 +83,7 @@ The first UI establishes:
 - Solana mainnet status
 - wallet connection
 - protection-oriented dashboard
-- explicit Kamino + Pyth data-source context
+- explicit Kamino + xStocks data-source context
 - empty-state position discovery area
 - explanation of Discover → Assess → Protect flow
 
@@ -116,51 +116,82 @@ The UI also exposes the latest scan time, errors, refresh action, obligation ide
 
 The current buffer is deliberately conservative: the lowest liquidation threshold among the xStock collateral reserves is compared with Kamino's account LTV. It is a risk signal for Weekend Gap Guard and is not presented as a replacement for Kamino's own liquidation engine. The final risk model combines this live buffer with the independently modeled weekend gap.
 
-## Pyth live-price milestone
+## Pyth investigation milestone — deferred
 
-Added:
+Pyth Pro/Lazer was tested with the project's real authenticated demo API key.
 
-- `src/lib/pyth.ts` — browser-safe client adapter that calls the protected backend function rather than embedding a Pyth key.
-- `supabase/functions/wgg-pyth/index.ts` — server-side Pyth adapter.
-- deployed Supabase Edge Function: `wgg-pyth`.
+Verified behavior on 2026-09-19:
+- The Playground can select a much larger catalog than the trial entitlement actually grants.
+- An authenticated multi-feed test returned explicit `Not entitled` errors for many crypto/FX feeds.
+- An authenticated NVDA test returned `Not entitled` for the NVDA equity feed and also reported one inactive feed.
+- Therefore the current demo key cannot be treated as a reliable source for the US-equity data required by Weekend Gap Guard.
 
-The function:
+Decision:
+- **Do not make Pyth Pro a required StockPass dependency.**
+- Keep the existing Pyth adapters dormant for possible future independent cross-checking.
+- Do not expose any Pyth API key in the frontend.
+- Do not pay for a Pyth Pro equity plan unless a later product requirement specifically justifies it.
 
-1. receives a list of underlying equity symbols derived from the actual xStock collateral found by Kamino
-2. resolves the corresponding current Pyth feed
-3. retrieves the latest parsed Pyth price update
-4. converts Pyth fixed-point price/exponent data into a normal USD price
-5. returns the price, confidence, publish time and feed ID
+The current WGG market-data architecture is xStocks-first instead.
 
-The Pyth API key is read only from the server-side `PYTH_API_KEY` secret and is never included in the frontend bundle. The deployed function intentionally returns a clear `PYTH_NOT_CONFIGURED` state until the project secret is supplied.
+## xStocks-native market-data milestone — 2026-09-19
 
-The UI now displays the independent Pyth price beside each discovered xStock position and clearly separates it from Kamino's account state.
+The project is explicitly built around Solana xStocks, so the xStocks public developer API becomes the primary source for current asset metadata and current xStock market data.
 
-## Historical weekend-gap milestone
+Current xStocks documentation states that public endpoints expose:
+- asset metadata
+- market price data
+- multiplier values
+- proof-of-reserves information
+- oracle feeds
+- corporate-action schedules
+- public xStocks wallet addresses
 
-Added:
+For Solana xStocks:
+- tokens use SPL Token-2022 with the Scaled UI Amount extension
+- raw on-chain balance remains constant through corporate actions
+- displayed/scaled balance is derived as raw amount × multiplier
+- raw amounts are used when building transactions
 
-- `supabase/functions/wgg-weekend-gap/index.ts` — server-side 13-week historical gap engine, capped at 26 weeks per request.
-- `fetchWeekendGapSummaries()` in `src/lib/pyth.ts`.
-- dashboard wiring in `src/WeekendGapGuardWorkspace.tsx`.
-- deployed Supabase Edge Function: `wgg-weekend-gap` version 2.
+Current xStock price data is sourced through the xStocks price-data endpoint, while execution/reference quotes are available through xChange RFQ. The app should therefore keep these concerns separate:
+- **current position valuation:** xStocks asset price + Solana raw balance + xStocks multiplier
+- **execution quote/reference:** xChange where needed
+- **lending state:** Kamino
+- **historical risk model:** separate daily OHLC source
 
-The historical engine:
+This architecture avoids using an unrelated oracle as the primary xStock price authority.
 
-1. derives each discovered xStock's underlying symbol from the real Kamino position
-2. resolves the corresponding Pyth Core equity feed server-side
-3. requests a Friday 15:59 America/New_York near-close observation
-4. requests the next available weekday 09:30 America/New_York session observation, with a weekday fallback for market holidays
-5. calculates the Friday-to-next-session return and the downside-only gap `max(0, -return)`
-6. reports median, 75th percentile, 90th percentile and maximum downside statistics
-7. uses the 75th percentile of downside observations as `typicalWeekendGapPct` for the first-pass WGG risk model
-8. returns the exact feed ID, sample count, date window and methodology so the frontend does not present an unexplained number
+## Historical weekend-gap milestone — revised 2026-09-19
 
-The Friday timestamp intentionally uses 15:59 rather than exactly 16:00 because the current Pyth v2 timestamp endpoint returns the first update whose publish time is at or after the requested timestamp. This avoids a Friday query accidentally jumping directly to a later session.
+The WGG risk model still needs approximately 13 weeks of:
 
-The frontend now feeds `current liquidation buffer + typical historical downside gap` into `evaluateWeekendRisk()` and shows the resulting `SAFE`, `WATCH` or `FLAGGED` state alongside each xStock.
+`Friday close → next trading-session open`
 
-No historical risk value is fabricated: when the Pyth API key is not configured or the feed has no usable observations, the UI shows an explicit unavailable state.
+observations.
+
+Pyth is no longer the required historical source.
+
+The selected first implementation source is **Twelve Data daily OHLC**:
+- current public documentation advertises 800 free API requests/day
+- daily historical range reaches back many years depending on symbol/market
+- US equities are supported
+- the WGG engine only needs daily open/close values for this calculation, not a high-frequency stream
+
+Historical calculation:
+1. Map the xStock symbol to its underlying equity symbol (for example AAPLx → AAPL, TSLAx → TSLA, NVDAx → NVDA).
+2. Fetch daily OHLC history for the underlying symbol.
+3. Identify valid Friday trading sessions and the next valid trading session.
+4. Record Friday close and next-session open.
+5. Calculate `gapPct = ((nextOpen - fridayClose) / fridayClose) * 100`.
+6. Calculate downside-only gap as `max(0, -gapPct)`.
+7. Produce median, p75, p90 and maximum downside statistics.
+8. Use the p75 downside statistic as the first-pass `typicalWeekendGapPct` input to the WGG risk model.
+9. Persist methodology, sample count and date window so the UI never presents an unexplained risk number.
+
+Important implementation rule:
+- Corporate-action-aware valuation must remain xStocks-native. xStocks' multiplier system handles dividends/splits/reverse splits; do not substitute an external provider's adjusted token balance for Solana raw xStock balance.
+- The historical provider is used only for the **risk-model dataset**, not as the authority for the user's actual xStock balance or Kamino collateral value.
+- If historical data is unavailable or insufficient, WGG must show an explicit unavailable state instead of fabricating a gap statistic.
 
 ## Protection action-planning milestone
 
@@ -231,16 +262,17 @@ The module deliberately does **not** guess earnings dates and does not yet claim
 
 ## Next implementation steps
 
-1. Configure the server-side `PYTH_API_KEY` and verify live price + historical weekend-gap responses for the supported xStock underlyings.
-2. Verify the new WASM-aware Vercel build reaches READY.
-3. Complete wallet-signature integration for prepared Kamino actions without giving the app any standing authorization.
-4. Add repay preparation alongside the current deposit preparation, including exact debt-reserve price/decimal handling from fresh Kamino state.
-5. Wire a server-side earnings-calendar adapter and treat missing calendar data as unavailable rather than inferred.
-6. Populate `wgg_monitored_positions` from trusted backend checks rather than browser-submitted balances.
-7. Build the Friday monitoring worker and `wgg_alerts` records.
-8. Reuse the existing Telegram connection pattern for opt-in notifications.
-9. Add Surfpool fixtures/cheatcodes for deterministic flagged-position demos.
-10. Run an end-to-end test before using real mainnet funds.
+1. Replace the current Pyth-backed WGG price/history adapters with the xStocks-native current-price path and Twelve Data daily-history path.
+2. Verify the revised market-data adapters against real xStock symbols and their underlying tickers.
+3. Verify the new WASM-aware Vercel build reaches READY.
+4. Complete wallet-signature integration for prepared Kamino actions without giving the app any standing authorization.
+5. Add repay preparation alongside the current deposit preparation, including exact debt-reserve price/decimal handling from fresh Kamino state.
+6. Wire a server-side earnings-calendar adapter and treat missing calendar data as unavailable rather than inferred.
+7. Populate `wgg_monitored_positions` from trusted backend checks rather than browser-submitted balances.
+8. Build the Friday monitoring worker and `wgg_alerts` records.
+9. Reuse the existing Telegram connection pattern for opt-in notifications.
+10. Add Surfpool fixtures/cheatcodes for deterministic flagged-position demos.
+11. Run an end-to-end test before using real mainnet funds.
 
 ## Testing policy
 
@@ -268,3 +300,45 @@ Added the first end-to-end native lending control surface.
 ### Required browser environment
 
 - VITE_SOLANA_RPC_URL — authenticated Solana mainnet RPC used by the browser to fetch lookup tables and confirm the wallet-signed transaction.
+
+
+## Market-data architecture decision — 2026-09-19
+
+### Current source-of-truth split
+
+| Concern | Source |
+| --- | --- |
+| xStock identity, mint, asset metadata | xStocks public API + official xStocks catalog |
+| Solana xStock raw balance | Solana mainnet RPC / Token-2022 |
+| Solana xStock multiplier | xStocks multiplier data / Token-2022 metadata |
+| Current xStock market price | xStocks public asset price-data endpoint |
+| Execution quote/reference when needed | xChange RFQ |
+| Collateral, debt, LTV, liquidation state | Kamino |
+| Historical Friday-close → next-session-open | Twelve Data daily OHLC |
+| Weekend-gap statistics | StockPass WGG engine |
+| Pyth | Deferred/optional; not required for current WGG path |
+
+### xStocks valuation rule
+
+For Solana Token-2022 xStocks:
+- raw amount is the transaction/on-chain balance
+- displayed/scaled amount = raw amount × current multiplier
+- current equity value must use the xStocks market price
+- corporate-action multipliers must be respected
+
+### Non-negotiable data-integrity rule
+
+Do not mix external historical pricing with token-balance authority:
+- xStocks/Solana determines what the user actually owns
+- Kamino determines what is actually collateralized/debt
+- Twelve Data only supplies the historical market series used to model weekend-gap risk
+
+### Pyth status
+
+Pyth integration remains in the repository from earlier implementation work, but it is **not the active source-of-truth path** after the 2026-09-19 entitlement test. Future cleanup can remove or archive the Pyth adapters after the xStocks/Twelve Data path is runtime-verified.
+
+### Documentation references
+
+- xStocks developer docs: https://docs.xstocks.fi/developers
+- xStocks multiplier docs: https://docs.xstocks.fi/developers/multipliers
+- Twelve Data stock/historical data: https://twelvedata.com/stocks
