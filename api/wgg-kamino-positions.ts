@@ -1,4 +1,3 @@
-import { address } from '@solana/kit';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY =
@@ -8,11 +7,7 @@ const SUPABASE_PUBLISHABLE_KEY =
 const MAINNET_RPC = process.env.SOLANA_RPC_URL || '';
 
 function validAddress(value: string) {
-  try {
-    return String(address(value)) === value;
-  } catch {
-    return false;
-  }
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
 }
 
 function json(res: any, body: unknown, status = 200) {

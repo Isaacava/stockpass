@@ -1,4 +1,3 @@
-import { address, createSolanaRpc } from '@solana/kit';
 
 const MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 
@@ -13,6 +12,7 @@ export default async function handler(req: any, res: any) {
   if (!rpcUrl) return json(res, { error: 'SOLANA_RPC_URL is not configured.' }, 503);
 
   try {
+    const { address, createSolanaRpc } = await import('@solana/kit');
     const { KaminoMarket, getMedianSlotDurationInMsFromLastEpochs } = await import('@kamino-finance/klend-sdk');
     const rpc = createSolanaRpc(rpcUrl);
     const recentSlotDurationMs = await getMedianSlotDurationInMsFromLastEpochs();

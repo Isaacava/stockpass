@@ -1,5 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-import { Connection } from '@solana/web3.js';
 const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
@@ -58,7 +56,7 @@ function fingerprintsEqual(actual: any, expected: any) {
     && actual.data === expected.data;
 }
 
-async function loadConfirmedTransaction(connection: Connection, signature: string) {
+async function loadConfirmedTransaction(connection: any, signature: string) {
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const tx = await connection.getParsedTransaction(signature, {
       commitment: 'confirmed',
@@ -79,6 +77,8 @@ export default async function handler(req: any, res: any) {
   if (!SUPABASE_SERVICE_ROLE_KEY) return json(res, { error: 'SUPABASE_SERVICE_ROLE_KEY is not configured.' }, 503);
 
   try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const { Connection } = await import('@solana/web3.js');
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
     const wallet = typeof body.wallet === 'string' ? body.wallet.trim() : '';
     const actionId = typeof body.actionId === 'string' ? body.actionId.trim() : '';

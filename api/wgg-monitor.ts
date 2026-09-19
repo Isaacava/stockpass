@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
 const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 import { evaluateEarningsRisk, type EarningsEvent } from '../src/lib/wggEarnings';
 import {
@@ -39,9 +38,7 @@ type WeekendGap = {
   }>;
 };
 
-const supabase = SUPABASE_SERVICE_ROLE_KEY
-  ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } })
-  : null;
+let supabase: any = null;
 
 function json(res: any, body: unknown, status = 200) {
   res.status(status).setHeader('Cache-Control', 'no-store').json(body);
@@ -563,6 +560,12 @@ export default async function handler(req: any, res: any) {
   const method = String(req.method || 'GET');
 
   try {
+    if (!supabase && SUPABASE_SERVICE_ROLE_KEY) {
+      const { createClient } = await import('@supabase/supabase-js');
+      supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
+    }
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});
     const wallet = typeof body.wallet === 'string' ? body.wallet.trim() : '';
     const mode = body.mode === 'state' || body.mode === 'sync' ? body.mode : 'cron';

@@ -1,6 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
-import { address, createNoopSigner, createSolanaRpc } from '@solana/kit';
-
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const MAINNET_RPC = process.env.SOLANA_RPC_URL || '';
@@ -16,11 +13,7 @@ type PreparedInstruction = {
 };
 
 function validAddress(value: string) {
-  try {
-    return String(address(value)) === value;
-  } catch {
-    return false;
-  }
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
 }
 
 function json(res: any, body: unknown, status = 200) {
@@ -59,6 +52,8 @@ export default async function handler(req: any, res: any) {
   if (!SUPABASE_SERVICE_ROLE_KEY) return json(res, { error: 'SUPABASE_SERVICE_ROLE_KEY is not configured.' }, 503);
 
   try {
+    const { address, createNoopSigner, createSolanaRpc } = await import('@solana/kit');
+    const { createClient } = await import('@supabase/supabase-js');
     // Keep the heavy Kamino action module inside the request boundary. If a
     // transitive ESM/runtime dependency is unavailable on Vercel, return the
     // underlying exception as JSON instead of crashing the whole invocation.

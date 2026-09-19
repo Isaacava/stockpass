@@ -1,7 +1,5 @@
 export const config = { runtime: 'nodejs', maxDuration: 30 };
 
-import { createClient } from '@supabase/supabase-js';
-
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
@@ -37,7 +35,10 @@ export default async function handler(req: any, res: any) {
     return json(res, { error: 'A valid wallet session is required.' }, 401);
   }
 
-  const authResponse = await fetch(`${SUPABASE_URL}/functions/v1/wallet-auth`, {
+  try {
+    const { createClient } = await import('@supabase/supabase-js');
+
+    const authResponse = await fetch(`${SUPABASE_URL}/functions/v1/wallet-auth`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -46,22 +47,26 @@ export default async function handler(req: any, res: any) {
     },
     body: JSON.stringify({ action: 'validate', wallet }),
   });
-  if (!authResponse.ok) return json(res, { error: 'Wallet session is invalid or expired.' }, 401);
+    if (!authResponse.ok) return json(res, { error: 'Wallet session is invalid or expired.' }, 401);
 
-  const token = randomToken();
-  const tokenHash = await sha256(token);
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    const token = randomToken();
+    const tokenHash = await sha256(token);
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { error } = await supabase.from('wgg_telegram_link_challenges').insert({
+    const { error } = await supabase.from('wgg_telegram_link_challenges').insert({
     token_hash: tokenHash,
     wallet,
     expires_at: expiresAt,
   });
-  if (error) throw error;
+    if (error) throw error;
 
-  return json(res, { token, expiresAt });
+    return json(res, { token, expiresAt });
+  } catch (error) {
+    console.error('wgg-telegram-link', error);
+    return json(res, { error: error instanceof Error ? error.message : 'Telegram linking failed.' }, 502);
+  }
 }

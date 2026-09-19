@@ -1,5 +1,3 @@
-import { address, createNoopSigner, createSolanaRpc } from '@solana/kit';
-
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY =
   process.env.SUPABASE_PUBLISHABLE_KEY ||
@@ -15,11 +13,7 @@ type PreparedInstruction = {
 };
 
 function validAddress(value: string) {
-  try {
-    return String(address(value)) === value;
-  } catch {
-    return false;
-  }
+  return /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(value);
 }
 
 function b64(bytes: Uint8Array | number[] | undefined): string {
@@ -61,6 +55,7 @@ export default async function handler(req: any, res: any) {
   if (!MAINNET_RPC) return json(res, { error: 'SOLANA_RPC_URL is not configured.' }, 503);
 
   try {
+    const { address, createNoopSigner, createSolanaRpc } = await import('@solana/kit');
     const {
       KaminoAction,
       KaminoMarket,
