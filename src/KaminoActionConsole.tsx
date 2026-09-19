@@ -56,6 +56,11 @@ async function readResponse(response: Response) {
 function tokenAmount(value: number | null | undefined) {
   return value == null || !Number.isFinite(value) ? '—' : value.toLocaleString(undefined, { maximumFractionDigits: 6 });
 }
+function preciseAmount(value: number, decimals: number) {
+  if (!Number.isFinite(value)) return '';
+  const safeDecimals = Math.max(0, Math.min(18, decimals));
+  return value.toFixed(safeDecimals).replace(/\.?0+$/, '');
+}
 
 export default function KaminoActionConsole({
   address, walletProvider, positions, onCompleted,
@@ -237,11 +242,12 @@ export default function KaminoActionConsole({
   const availableActions = (Object.keys(actionMeta) as ActionType[]).filter((item) => item === 'supply' || positions.length > 0);
   const current = actionMeta[action];
   const quickFillBase = action === 'repay' ? debt?.amount : action === 'withdraw' ? collateral?.amount : action === 'close' ? debt?.amount : undefined;
+  const quickFillDecimals = action === 'repay' || action === 'close' ? (debt?.mintDecimals ?? 6) : (collateral?.mintDecimals ?? 6);
   const quickFillUnit = action === 'repay' ? (debt ? debt.mint.slice(0, 7) + '…' : 'DEBT') : action === 'withdraw' ? (collateral?.symbol ?? 'xStock') : action === 'close' ? (debt ? debt.mint.slice(0, 7) + '…' : 'DEBT') : '';
 
   function applyQuickFill(percentage: number) {
     if (quickFillBase == null) return;
-    setAmount(String(Math.max(0, quickFillBase * percentage)));
+    setAmount(preciseAmount(Math.max(0, quickFillBase * percentage), quickFillDecimals));
   }
 
   return (
@@ -331,7 +337,7 @@ export default function KaminoActionConsole({
                   base={collateral?.amount}
                   quickFillUnit={collateral?.symbol ?? 'xStock'}
                   applyQuickFill={(percentage) => {
-                    if (collateral?.amount != null) setWithdrawAmount(String(collateral.amount * percentage));
+                    if (collateral?.amount != null) setWithdrawAmount(preciseAmount(Math.max(0, collateral.amount * percentage), collateral.mintDecimals));
                   }}
                 />
               )}
