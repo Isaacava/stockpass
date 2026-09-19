@@ -923,3 +923,30 @@ No fake balances, fake risk readings, fake alerts, simulated timers, simulated c
 ### Verification state
 
 Source-level review was completed after the redesign. Local production build execution is still constrained by the current runtime's inability to resolve GitHub DNS / fetch a repository checkout. Vercel/GitHub CI status for the latest `main` commits remains the final build gate and must be checked before describing the deployment as READY.
+
+
+## Runtime dependency + first-position Actions milestone — 2026-09-19
+
+Live page verification exposed a common runtime failure across Positions, Guard, Monitoring, and Actions:
+`Failed to resolve module specifier "@solana-program/memo"`.
+The original attempted direct Memo dependency version `0.12.x` was incompatible with the project's `@solana/kit@2.3.x` peer generation and caused npm ERESOLVE. StockPass has been corrected to `@solana-program/memo@^0.7.0`, the package generation used alongside `@solana/kit@2.3.0` in Solana web3.js 2-era examples.
+
+The Actions route now supports a wallet with no existing Kamino obligation:
+
+- **Create position** prepares a real `KaminoAction.buildDepositTxns()` flow using `VanillaObligation(PROGRAM_ID)`.
+- The user selects a supported xStock reserve and amount.
+- The server skips the existing-obligation lookup only for the explicitly marked first-position request.
+- The wallet still reviews and signs the real mainnet transaction.
+- Server confirmation verification remains unchanged.
+- No local/synthetic position is inserted; the new obligation appears only after a confirmed mainnet transaction and a subsequent Kamino rescan.
+
+The user-facing action set is now:
+Create position, Supply, Borrow, Add collateral, Repay, Withdraw, Close.
+
+Browser RPC remains same-origin `/api/solana-rpc`; the upstream credential remains server-only in `SOLANA_RPC_URL`.
+
+Verification status at this checkpoint:
+- Previous source/CI fixes through commit `c52809e...` are confirmed green and a READY Vercel deployment exists for that commit.
+- The newer Create Position + Memo dependency commits are on `main`.
+- GitHub Actions run #166 for commit `92b1dbcff3668f68adc85e091aafa67dd64f09c3` is still running at the dependency-install stage.
+- Vercel has not yet shown a deployment for commit `92b1dbc...`; the latest later Vercel deployment visible in the project was the intentionally failed `0.12.x` Memo dependency attempt.
