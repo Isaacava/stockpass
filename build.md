@@ -245,3 +245,26 @@ The module deliberately does **not** guess earnings dates and does not yet claim
 ## Testing policy
 
 Use Surfpool for deterministic development and demo testing. The first real-mainnet smoke test should use only a minimal amount needed for wallet/signature/transaction-fee validation. Never fabricate a real position in the UI.
+
+
+## Native Kamino action milestone — 2026-09-19
+
+Added the first end-to-end native lending control surface.
+
+- src/KaminoActionConsole.tsx adds Borrow, Lend/Supply, Add Collateral, Repay, Withdraw Collateral, and Close Position controls.
+- api/kamino-market.ts reads the active Kamino Main Market reserve catalog from a server-side dedicated RPC.
+- api/kamino-actions-prepare.ts uses the current klend SDK builders directly: buildDepositReserveLiquidityTxns for pure liquidity supply, buildDepositTxns for collateral, buildBorrowTxns for borrow, buildRepayTxns for repay, buildWithdrawTxns for collateral withdrawal, and buildRepayAndWithdrawTxns for the self-service close flow.
+- Every obligation action reloads the current Kamino Main Market and verifies the obligation belongs to the authenticated wallet before building instructions.
+- Prepared actions are recorded in wgg_platform_actions server-side.
+- api/kamino-actions-verify.ts verifies the confirmed transaction on mainnet, checks the authenticated wallet signer and Kamino program ID, then records the action as confirmed.
+- Verified actions trigger a fresh Kamino xStock position sync into wgg_monitored_positions.
+- No private key, custody, standing authorization, or automatic transaction execution was added.
+
+### Required Vercel server environment
+
+- SOLANA_RPC_URL — dedicated authenticated Solana mainnet RPC; do not use the public Solana endpoint.
+- SUPABASE_SERVICE_ROLE_KEY — server-only Supabase service-role key used only by the action ledger and verification endpoints.
+
+### Required browser environment
+
+- VITE_SOLANA_RPC_URL — authenticated Solana mainnet RPC used by the browser to fetch lookup tables and confirm the wallet-signed transaction.
