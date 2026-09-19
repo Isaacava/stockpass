@@ -5,9 +5,7 @@ import { STOCKPASS_REOWN_PROJECT_ID } from './reown-hardcoded';
 
 const solanaAdapter = new SolanaAdapter();
 
-export const walletConnectReady = true;
-
-createAppKit({
+export const appKit = createAppKit({
   adapters: [solanaAdapter],
   networks: [solana],
   defaultNetwork: solana,
@@ -18,14 +16,12 @@ createAppKit({
     url: window.location.origin,
     icons: [window.location.origin + '/favicon.svg'],
   },
-  enableReconnect: true,
-  enableMobileFullScreen: true,
-  enableWalletGuide: false,
-  allWallets: 'ONLY_MOBILE',
   features: {
     analytics: false,
     email: false,
     socials: [],
-    connectMethodsOrder: ['wallet'],
+    swaps: false,
+    onramp: false,
   },
+  allWallets: 'SHOW',
 });
