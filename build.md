@@ -1,344 +1,918 @@
-## Current implementation checkpoint
+# StockPass — Weekend Gap Guard Build Log
 
-**Verified on 2026-09-19**
+**Repository:** `Isaacava/stockpass`  
+**Branch:** `main`  
+**Project:** StockPass / Weekend Gap Guard (WGG)  
+**Checkpoint:** 2026-09-19  
+**Purpose:** Current implementation state and handoff source of truth for future work.
 
-- Main branch uses the WGG workspace as the live entry point; Reown is the active wallet integration.
-- The WGG protection API accepts `SOLANA_RPC_URL`, `SUPABASE_URL`, and `SUPABASE_PUBLISHABLE_KEY` from the Vercel server environment.
-- Duplicate/unreferenced WGG modules were removed: `WeekendGapGuardWorkspaceV2.tsx`, `kaminoProtection.ts`, `wggKamino.ts`, and `WalletAuthGate.tsx`.
-- TypeScript is restricted to the live WGG source dependency graph instead of checking the legacy StockPass UI tree.
-- The protection workspace compile error from the duplicate `targetLtvPct` declaration is fixed.
-- Repay preparation no longer depends on a browser Pyth price for its amount; the Vercel endpoint recalculates the repay amount from fresh Kamino debt state, live debt-reserve oracle price and mint decimals.
-- GitHub Actions now passes dependency installation, `tsc --noEmit --pretty false`, and the WASM production build.\n- Vercel reports the corrected WGG deployment as READY, and its deployment root returns HTTP 200.\n- The browser signer bridge now uses a local minimal wallet-provider interface, has no duplicate React hook imports, and reconstructs `TransactionInstruction.data` using the `Buffer` shape required by the installed Solana web3 types.\n- The remaining gate is runtime verification: production Pyth configuration plus one real wallet-authenticated protection-prepare/sign/submit smoke test.
+> **Important:** `main` is the current Weekend Gap Guard build. The `stockpass` branch is the preserved older StockPass application. AgentMarket is completely out of scope.
 
-# Weekend Gap Guard build log
+---
 
-## Project direction
+## 1. Product direction
 
-Weekend Gap Guard is the new STOCKLANA project being built on the repository `main` branch.
+Weekend Gap Guard is a non-custodial protection and monitoring layer for real **Solana xStocks positions used with Kamino**.
 
-It is a protection overlay for real Kamino xStock lending positions on Solana. It does not replace Kamino, custody user funds, or automatically move funds. The core flow is:
+The product does not replace Kamino, does not custody user funds, and does not receive standing transaction authority.
 
-1. Discover the connected wallet's real Kamino obligations.
-2. Filter obligations that use supported xStocks as collateral.
-3. Read Kamino's current collateral, debt and health/liquidation state.
-4. Estimate typical Friday-close → Monday/next-session-open gap risk.
-5. Overlay upcoming earnings risk where relevant.
-6. Run the protection check before the weekend.
-7. Alert the user when the current buffer may not cover the modeled gap.
-8. Prepare a specific Kamino repay/deposit action for the user to review and sign.
+Core flow:
 
-Every fund-moving action remains wallet-signed by the user. No standing authorization and no custody.
+1. Connect the user's Solana wallet.
+2. Discover real Kamino obligations for that wallet.
+3. Identify supported xStock collateral.
+4. Read actual Kamino collateral, debt, account LTV and liquidation thresholds.
+5. Value the user's xStock using the xStocks-native asset price and Token-2022 multiplier rules.
+6. Build a historical weekend-gap profile for the underlying equity.
+7. Combine the current Kamino liquidation buffer with the modeled downside weekend gap.
+8. Surface a risk state and explain the evidence behind it.
+9. Offer a concrete Kamino protection action for the user to review and sign.
+10. Continue monitoring and alert the user before/around high-risk weekends.
 
-## Important environment rule
+No fabricated balances, fake Kamino positions, fake risk values, automatic liquidation, or custodial signing.
 
-- `main` = Weekend Gap Guard.
-- `stockpass` = preserved previous StockPass application.
-- AgentMarket infrastructure is completely out of scope and must not be changed.
-- Existing StockPass Supabase project is reused for this project because no additional Supabase project is available on the current plan.
-- New tables are namespaced with `wgg_` to keep the old StockPass data isolated.
+---
 
-## Current research verification
+## 2. Authoritative data architecture — current decision
 
-Current-source verification was performed before implementation began.
+The current source-of-truth split is:
 
-- Kamino's current TypeScript SDK is `@kamino-finance/klend-sdk`. The current package is published as 12.0.0 and documents `KaminoMarket` reads plus `KaminoAction` lending operations. The official repository and package should remain the source of truth for API changes.
-- Kamino's current mainnet Main Market address used by the SDK examples is `7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF`.
-- Pyth was investigated as a possible market-data provider, but the current 14-day Pyth Pro demo key is not entitled to the required US-equity feeds (the authenticated NVDA test returned "Not entitled" for the NVDA equity feed). Pyth is therefore **deferred and is not the source of truth for WGG market data in the current architecture**.
-- The project instead uses xStocks-native public market/asset data for current xStock state and a separate historical OHLC provider for the 13-week weekend-gap model.
-- Nasdaq's public earnings calendar endpoint is a current candidate source for a server-side earnings adapter; the adapter must remain server-side and should treat missing/ambiguous calendar data as unavailable rather than infer a report date. Current public references document `https://api.nasdaq.com/api/calendar/earnings?date=YYYY-MM-DD`. citeturn508859search0turn508859search4
-- Surfpool is the planned local test environment for a fork of real Solana mainnet state so demo positions can be tested without real funds.
-- STOCKLANA is currently live on the Solana hackathon site and is the target hackathon for this build.
+| Concern | Source of truth |
+| --- | --- |
+| xStock identity, symbol, mint, asset metadata | xStocks official API/catalog |
+| Solana xStock raw balance | Solana mainnet RPC / Token-2022 |
+| xStock Token-2022 multiplier | xStocks multiplier data / Token-2022 metadata |
+| Current xStock market price | xStocks public asset price-data |
+| Optional execution/reference quote | xChange RFQ |
+| Collateral, debt, account LTV, liquidation state | Kamino |
+| Historical Friday-close → next-session-open series | Twelve Data daily OHLC |
+| Weekend-gap statistics | StockPass WGG risk engine |
+| Wallet transaction context | Solana mainnet activity |
+| Pyth | **Deferred / optional; not required for the current WGG path** |
 
-## First implementation milestone
+### Non-negotiable integrity rule
 
-### Risk engine
+Do not mix authorities:
 
-Added `src/lib/wggRisk.ts` with a pure, backend-input-driven first-pass risk model. It accepts a current buffer, typical weekend gap and optional earnings adjustment and returns `safe`, `watch` or `flagged`.
+- **Solana** determines what the wallet actually owns.
+- **xStocks** determines current xStock asset pricing and multiplier/corporate-action context.
+- **Kamino** determines actual collateral, debt, LTV and liquidation state.
+- **Twelve Data** is used only for historical market data needed by the statistical weekend-gap model.
+- Historical pricing must never be used to invent token balances or Kamino balances.
 
-The module now also contains two algebraic action-planning helpers:
+---
 
-- `calculateRepayUsdForTargetLtv()` estimates debt repayment required to reach a target LTV while holding collateral value constant.
-- `calculateCollateralUsdForTargetLtv()` estimates additional collateral value required to reach a target LTV while holding debt constant.
+## 3. Why Pyth was removed from the required path
 
-These are planning estimates only. They do not construct or send a transaction, and final action construction must re-read current Kamino state immediately before a wallet signature.
+Pyth was originally used for two WGG jobs:
 
-### Supabase
+1. current asset price
+2. historical Friday-close → next-session-open samples
 
-Added the following Weekend Gap Guard tables to the existing StockPass Supabase project:
+The real authenticated Pyth Pro/Lazer trial key was tested in the official Playground.
+
+The result showed:
+
+- the Playground can display/select a much larger global feed catalog than the current grant permits;
+- many selected feeds returned explicit `Not entitled` errors;
+- an authenticated NVDA test returned `Not entitled` for the NVDA equity feed and also reported an inactive feed.
+
+Therefore the current Pyth demo key must **not** be treated as the reliable US-equity source for WGG.
+
+Decision:
+
+- Do not make Pyth Pro a required StockPass dependency.
+- Do not pay for a Pyth equity plan solely for this project at the current stage.
+- Keep the existing Pyth adapters dormant temporarily for possible future independent price cross-checking.
+- Never expose a Pyth API key in the browser.
+
+Pyth can be reconsidered later as an independent oracle/check, but it is not required for the current end-to-end architecture.
+
+---
+
+## 4. xStocks-first market-data model
+
+StockPass is specifically built around xStocks, so the asset layer should be xStocks-native.
+
+Current xStocks documentation exposes public developer data for:
+
+- asset metadata
+- current price data
+- multiplier information
+- proof of reserves
+- oracle-related data
+- corporate actions
+- public addresses
+
+For Solana xStocks:
+
+- they use Token-2022;
+- the Scaled UI Amount extension is relevant to displayed amounts;
+- raw token amounts are the actual on-chain amounts;
+- displayed/scaled amounts are derived using the applicable multiplier;
+- transaction amounts must use the correct raw/base-unit amount.
+
+### xStock valuation rule
+
+Example:
+
+`AAPLx → AAPL`
+
+1. Read actual AAPLx raw balance from Solana.
+2. Read the applicable xStocks multiplier.
+3. Derive the displayed/scaled xStock amount.
+4. Obtain current xStocks asset price.
+5. Calculate current position value.
+6. Keep raw balance and transaction amount separate from display/scaled value.
+
+Do not substitute an external provider's adjusted balance for the real Token-2022 balance.
+
+### Current price vs execution quote
+
+These are separate concepts:
+
+- **Position valuation:** xStocks current price.
+- **Execution/reference quote:** xChange RFQ where the product flow needs an executable/reference quote.
+
+---
+
+## 5. Historical weekend-gap model
+
+WGG still needs a historical dataset for:
+
+**Friday close → next trading-session open**
+
+The first-pass window is approximately **13 weeks**.
+
+### Historical source
+
+Use **Twelve Data daily OHLC** as the first implementation source.
+
+The model only needs:
+
+- trading date
+- open
+- close
+
+It does not need a 200ms live stream for this calculation.
+
+### Symbol mapping
+
+The historical provider is queried using the **underlying equity symbol**, not the Solana token symbol.
+
+Examples:
+
+- AAPLx → AAPL
+- TSLAx → TSLA
+- NVDAx → NVDA
+- SPYx → SPY
+- QQQx → QQQ
+
+The xStock mapping must come from the trusted xStocks catalog rather than free-form user input.
+
+### Calculation
+
+For each valid week:
+
+`gapPct = ((nextSessionOpen - fridayClose) / fridayClose) * 100`
+
+Downside-only gap:
+
+`downsideGapPct = max(0, -gapPct)`
+
+Aggregate:
+
+- sample count
+- median gap
+- p75 gap
+- p90 gap
+- maximum downside gap
+- typical downside weekend gap
+
+First-pass WGG policy:
+
+- use the **75th percentile of downside observations** as `typicalWeekendGapPct`;
+- retain the methodology and date window;
+- never show a fabricated number when data is missing or insufficient.
+
+### Trading-calendar rule
+
+Do not assume every Friday is followed by Monday.
+
+The historical worker must:
+
+1. identify a real Friday trading session;
+2. find the next valid trading session;
+3. record Friday close;
+4. record next-session open;
+5. calculate the gap;
+6. skip invalid/missing observations rather than manufacturing values.
+
+---
+
+## 6. Existing WGG risk model
+
+File:
+
+`src/lib/wggRisk.ts`
+
+The current risk engine is pure and backend-input-driven.
+
+Main input concept:
+
+- current liquidation buffer
+- modeled typical downside weekend gap
+- optional earnings risk adjustment
+
+Risk statuses:
+
+- `safe`
+- `watch`
+- `flagged`
+
+Planning helpers include:
+
+- `calculateRepayUsdForTargetLtv()`
+- `calculateCollateralUsdForTargetLtv()`
+
+These are planning calculations only.
+
+They must never be treated as a transaction or as authoritative Kamino state.
+
+Before a transaction is prepared, Kamino state must be reloaded.
+
+---
+
+## 7. Earnings-risk module
+
+File:
+
+`src/lib/wggEarnings.ts`
+
+The module:
+
+- accepts only trusted calendar input;
+- normalizes the symbol;
+- detects whether an event is within the next five calendar days;
+- retains report timing (`before_open`, `after_close`, `unspecified`);
+- returns no risk when the event is missing/invalid;
+- provides a separate earnings multiplier helper.
+
+It deliberately does **not** guess earnings dates.
+
+Next step:
+
+- add a server-side earnings calendar adapter;
+- validate the response;
+- treat unavailable/ambiguous calendar data as unavailable;
+- never invent an earnings date.
+
+---
+
+## 8. Live Kamino integration
+
+File:
+
+`src/lib/kamino.ts`
+
+Current live capabilities:
+
+- connect to configured Solana mainnet RPC;
+- load Kamino Main Market;
+- obtain current SDK ledger instant;
+- discover the wallet's real Kamino obligations;
+- resolve reserve liquidity mints;
+- resolve supported xStock reserves;
+- filter obligations to xStock-backed positions;
+- return real obligation address;
+- return xStock symbol/mint;
+- return collateral amount;
+- return debt reserve information;
+- return account LTV;
+- return deposit/borrow values;
+- expose mint decimals;
+- expose liquidation threshold;
+- calculate a conservative liquidation-buffer signal.
+
+Current Kamino Main Market address used by the implementation:
+
+`7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF`
+
+Current Kamino program ID used by the implementation:
+
+`KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD`
+
+The dashboard's **Scan my Kamino positions** action is read-only and displays only real positions returned by Kamino.
+
+No balances are injected when the wallet has no matching position.
+
+---
+
+## 9. Native Kamino action console
+
+File:
+
+`src/KaminoActionConsole.tsx`
+
+The current control surface provides:
+
+- Borrow
+- Lend / Supply
+- Add collateral
+- Repay
+- Withdraw collateral
+- Close position
+
+The implementation uses the current Kamino SDK action builders:
+
+- `buildDepositReserveLiquidityTxns()` for pure liquidity supply
+- `buildDepositTxns()` for collateral
+- `buildBorrowTxns()` for borrow
+- `buildRepayTxns()` for repay
+- `buildWithdrawTxns()` for collateral withdrawal
+- `buildRepayAndWithdrawTxns()` for close
+
+Server APIs:
+
+- `api/kamino-market.ts`
+- `api/kamino-actions-prepare.ts`
+- `api/kamino-actions-verify.ts`
+
+### Action safety model
+
+For wallet actions:
+
+1. validate the wallet session;
+2. reload Kamino Main Market;
+3. reload current ledger/state;
+4. validate the selected obligation belongs to the wallet;
+5. build unsigned instructions;
+6. record the intent/action in `wgg_platform_actions`;
+7. return unsigned instructions to the browser;
+8. let the connected wallet sign;
+9. submit/confirm on mainnet;
+10. verify the confirmed transaction server-side;
+11. refresh Kamino state.
+
+No private key is stored by StockPass.
+
+No standing authorization exists.
+
+No automatic transaction execution exists.
+
+---
+
+## 10. Platform-action ledger
+
+Migration:
+
+`supabase/migrations/0005_wgg_platform_actions.sql`
+
+Live table:
+
+`public.wgg_platform_actions`
+
+Fields include:
+
+- `id`
+- `wallet`
+- `action_type`
+- `obligation_address`
+- `reserve_address`
+- `withdraw_reserve_address`
+- `amount_base_units`
+- `withdraw_amount_base_units`
+- `status`
+- `transaction_signature`
+- `kamino_program_id`
+- `metadata`
+- `created_at`
+- `submitted_at`
+- `confirmed_at`
+
+Statuses:
+
+- `prepared`
+- `submitted`
+- `confirmed`
+- `failed`
+- `expired`
+
+RLS is enabled and writes/reads are intended to happen through trusted backend/service-role paths.
+
+---
+
+## 11. Platform API files added
+
+### `api/kamino-market.ts`
+
+GET endpoint that:
+
+- requires `SOLANA_RPC_URL`;
+- loads Kamino Main Market server-side;
+- returns active reserve catalog;
+- returns reserve address, symbol, mint, decimals and oraclePrice.
+
+### `api/kamino-actions-prepare.ts`
+
+POST endpoint that:
+
+- requires server RPC and Supabase service-role key;
+- validates wallet/action/amount/reserve input;
+- validates the wallet session;
+- reloads Kamino state;
+- verifies obligation ownership where applicable;
+- builds the selected SDK action;
+- serializes unsigned instructions and lookup tables;
+- records the prepared action.
+
+### `api/kamino-actions-verify.ts`
+
+POST endpoint that:
+
+- validates wallet session;
+- loads the action ledger row;
+- retrieves the confirmed Solana transaction;
+- verifies the authenticated wallet signer;
+- verifies the transaction includes the Kamino program;
+- marks the action confirmed;
+- refreshes the wallet's Kamino xStock position state.
+
+Important future hardening:
+
+- verify the exact intended action/instruction contents more deeply instead of relying primarily on signer + Kamino-program presence.
+
+---
+
+## 12. WGG database tables
+
+Existing WGG tables:
 
 - `wgg_monitored_positions`
 - `wgg_alerts`
 - `wgg_telegram_links`
 - `wgg_check_runs`
+- `wgg_project_docs`
+- `wgg_platform_actions`
 
-RLS is enabled. These tables are intended to be populated by trusted backend workers rather than fabricated from frontend state.
+WGG monitored positions include fields such as:
 
-### Frontend shell
+- wallet
+- Kamino market
+- obligation address
+- xStock collateral mint
+- symbol
+- collateral amount
+- collateral USD value
+- debt USD
+- health factor
+- liquidation LTV
+- current buffer
+- typical weekend gap
+- earnings risk
+- risk status
+- recommended repayment
+- recommended additional collateral
+- last checked timestamp
 
-Replaced the old main-branch StockPass workspace entry point with `WeekendGapGuardWorkspace`.
+Risk statuses include:
 
-The first UI establishes:
+- `unknown`
+- `safe`
+- `watch`
+- `flagged`
+- `stale`
 
-- Weekend Gap Guard identity
-- Solana mainnet status
-- wallet connection
-- protection-oriented dashboard
-- explicit Kamino + xStocks data-source context
-- empty-state position discovery area
-- explanation of Discover → Assess → Protect flow
+---
 
-The UI intentionally does not show fake Kamino balances or fake risk readings.
+## 13. Existing wallet/activity context
 
-## Live Kamino discovery milestone
+The repository contains an older Solana activity subsystem:
 
-### Current SDK integration
+`src/lib/solanaActivity.ts`
 
-Added `@kamino-finance/klend-sdk` 12.x and the SDK's required Solana Kit dependencies to the main-branch application.
+It can inspect recent Solana transaction/token-balance changes and classify context such as:
 
-Added `src/lib/kamino.ts` which:
+- trade inferred
+- transfer inferred
+- buy
+- sell
+- receive
+- send
 
-- connects to the configured Solana mainnet RPC
-- loads Kamino's Main Market using the current SDK
-- obtains the SDK's current ledger instant
-- reads all user obligations for the connected wallet
-- resolves reserve liquidity mints through Kamino's current reserve API
-- resolves the supported Solana xStock catalog through the existing official xStocks API adapter
-- filters the wallet's Kamino obligations to those containing an official xStock reserve
-- returns the real obligation address, xStock mint/symbol, collateral amount, debt reserves, account LTV and SDK-provided deposit/borrow values
-- exposes xStock mint decimals so a later action builder can convert a USD collateral estimate into exact base units
-- extracts the applicable xStock reserve liquidation threshold and exposes a conservative liquidation buffer signal as `liquidation LTV - current account LTV`
+Important rule:
 
-The dashboard now has a real **Scan my Kamino positions** action. It performs a read-only mainnet scan and displays only positions actually returned by Kamino. No test balance is injected when the wallet has no matching position.
+These labels are **context only**.
 
-The UI also exposes the latest scan time, errors, refresh action, obligation identifier, xStock collateral amounts, LTV, liquidation LTV, current liquidation buffer, deposit value, borrow value and debt-asset count.
+They are not the authoritative source for Kamino collateral/debt.
 
-### Liquidation-buffer scope note
+Correct pattern:
 
-The current buffer is deliberately conservative: the lowest liquidation threshold among the xStock collateral reserves is compared with Kamino's account LTV. It is a risk signal for Weekend Gap Guard and is not presented as a replacement for Kamino's own liquidation engine. The final risk model combines this live buffer with the independently modeled weekend gap.
+`on-chain activity → mark position/context dirty → refresh Kamino state → evaluate WGG`
 
-## Pyth investigation milestone — deferred
+Never derive authoritative lending state from heuristic wallet-activity classification.
 
-Pyth Pro/Lazer was tested with the project's real authenticated demo API key.
+---
 
-Verified behavior on 2026-09-19:
-- The Playground can select a much larger catalog than the trial entitlement actually grants.
-- An authenticated multi-feed test returned explicit `Not entitled` errors for many crypto/FX feeds.
-- An authenticated NVDA test returned `Not entitled` for the NVDA equity feed and also reported one inactive feed.
-- Therefore the current demo key cannot be treated as a reliable source for the US-equity data required by Weekend Gap Guard.
+## 14. Telegram
 
-Decision:
-- **Do not make Pyth Pro a required StockPass dependency.**
-- Keep the existing Pyth adapters dormant for possible future independent cross-checking.
-- Do not expose any Pyth API key in the frontend.
-- Do not pay for a Pyth Pro equity plan unless a later product requirement specifically justifies it.
+Existing WGG Telegram link infrastructure:
 
-The current WGG market-data architecture is xStocks-first instead.
+`wgg_telegram_links`
 
-## xStocks-native market-data milestone — 2026-09-19
+The intended future workflow is:
 
-The project is explicitly built around Solana xStocks, so the xStocks public developer API becomes the primary source for current asset metadata and current xStock market data.
+1. user explicitly opts in;
+2. Telegram identity is linked;
+3. trusted backend worker generates alert;
+4. alert is deduplicated in `wgg_alerts`;
+5. Telegram notification is sent;
+6. user can acknowledge the alert.
 
-Current xStocks documentation states that public endpoints expose:
-- asset metadata
-- market price data
-- multiplier values
-- proof-of-reserves information
-- oracle feeds
-- corporate-action schedules
-- public xStocks wallet addresses
+No unsolicited messaging and no frontend-generated alert claims.
 
-For Solana xStocks:
-- tokens use SPL Token-2022 with the Scaled UI Amount extension
-- raw on-chain balance remains constant through corporate actions
-- displayed/scaled balance is derived as raw amount × multiplier
-- raw amounts are used when building transactions
+---
 
-Current xStock price data is sourced through the xStocks price-data endpoint, while execution/reference quotes are available through xChange RFQ. The app should therefore keep these concerns separate:
-- **current position valuation:** xStocks asset price + Solana raw balance + xStocks multiplier
-- **execution quote/reference:** xChange where needed
-- **lending state:** Kamino
-- **historical risk model:** separate daily OHLC source
+## 15. Existing Pyth code — dormant
 
-This architecture avoids using an unrelated oracle as the primary xStock price authority.
+Pyth-related files currently remain in the repository from the earlier architecture:
 
-## Historical weekend-gap milestone — revised 2026-09-19
+- `src/lib/pyth.ts`
+- `supabase/functions/wgg-pyth/index.ts`
+- `supabase/functions/wgg-weekend-gap/index.ts`
 
-The WGG risk model still needs approximately 13 weeks of:
+These are **not the target architecture anymore**.
 
-`Friday close → next trading-session open`
+They should eventually be:
 
-observations.
+- replaced by xStocks current-price handling;
+- replaced by Twelve Data historical OHLC handling;
+- removed or archived after the new paths are runtime-verified.
 
-Pyth is no longer the required historical source.
+Do not leave the repository with two competing "sources of truth" in active runtime code.
 
-The selected first implementation source is **Twelve Data daily OHLC**:
-- current public documentation advertises 800 free API requests/day
-- daily historical range reaches back many years depending on symbol/market
-- US equities are supported
-- the WGG engine only needs daily open/close values for this calculation, not a high-frequency stream
+---
 
-Historical calculation:
-1. Map the xStock symbol to its underlying equity symbol (for example AAPLx → AAPL, TSLAx → TSLA, NVDAx → NVDA).
-2. Fetch daily OHLC history for the underlying symbol.
-3. Identify valid Friday trading sessions and the next valid trading session.
-4. Record Friday close and next-session open.
-5. Calculate `gapPct = ((nextOpen - fridayClose) / fridayClose) * 100`.
-6. Calculate downside-only gap as `max(0, -gapPct)`.
-7. Produce median, p75, p90 and maximum downside statistics.
-8. Use the p75 downside statistic as the first-pass `typicalWeekendGapPct` input to the WGG risk model.
-9. Persist methodology, sample count and date window so the UI never presents an unexplained risk number.
+## 16. Vite / WASM build handling
 
-Important implementation rule:
-- Corporate-action-aware valuation must remain xStocks-native. xStocks' multiplier system handles dividends/splits/reverse splits; do not substitute an external provider's adjusted token balance for Solana raw xStock balance.
-- The historical provider is used only for the **risk-model dataset**, not as the authority for the user's actual xStock balance or Kamino collateral value.
-- If historical data is unavailable or insufficient, WGG must show an explicit unavailable state instead of fabricating a gap statistic.
+The Kamino SDK pulls dependencies that require WASM support.
 
-## Protection action-planning milestone
+Current build support includes:
 
-The risk module contains a first-pass protection planner for target LTV and can calculate both estimated repayment and estimated additional collateral value.
+- `vite-plugin-wasm`
+- `vite.config.wasm.ts`
+- `vercel.json` build override
 
-The frontend now takes the next step when a position is actually `FLAGGED`:
+The production build command is configured around TypeScript checking plus the WASM-aware Vite build.
 
-- derives a protection target LTV from the live liquidation LTV and adjusted weekend-gap signal
-- estimates the additional collateral value required to reach that target
-- converts that collateral USD estimate into xStock base units using the real reserve mint decimals and the independent Pyth price
-- reloads the current Kamino market and selected obligation
-- builds a real `KaminoAction.buildDepositTxns()` action with the current Kamino SDK
-- exposes the resulting instruction counts as a prepared action
+The build system previously failed when Rollup could not correctly load an Orca WASM dependency pulled through the Kamino SDK. The WASM-aware configuration was added to address this.
 
-This stage is still **prepare-only**: it does not sign, submit, or move funds. The SDK action is built against fresh on-chain state immediately before preparation. The current Kamino SDK documents `buildDepositTxns()` and `buildRepayTxns()` as supported lending-action builders, and `KaminoAction.actionToIxs()` converts the prepared action into its instruction set. fileciteturn797file0turn807file0
+---
 
-## Build-system verification milestone
+## 17. CI and deployment state
 
-The first browser bundle attempt exposed an Orca WASM dependency pulled in through the Kamino SDK. Vercel's build failed while Rollup was trying to load `orca_whirlpools_core_js_bindings_bg.wasm`.
+GitHub Actions workflow:
 
-The repository already contains `vite-plugin-wasm` in `devDependencies`. Because the existing `vite.config.ts` content could not be safely replaced through the connected GitHub contents action, the build now uses two new files instead:
+**StockPass build**
 
-- `vite.config.wasm.ts` — Vite + React + `vite-plugin-wasm` configuration.
-- `vercel.json` — overrides the Vercel build command to run `tsc --noEmit && vite build --config vite.config.wasm.ts`.
+Checks:
 
-The latest Vercel deployment for commit `1bbbb2b2e8fe4d088723d5ab6c4cf7aef2cfef7c` is currently queued; its current error log contains no error/stderr/exit events yet. It is not being marked READY until Vercel reports a completed state.
+- dependency install
+- `tsc --noEmit --pretty false`
+- WASM production build
 
-## Wallet-authenticated protection execution milestone
+Known previous TypeScript issue:
 
-The protection path has now been split from the Supabase Edge runtime because bundling the Kamino SDK inside the Edge Function timed out.
+`WeekendGapGuardWorkspace.tsx` had a wallet-address narrowing issue; the current fix passes the wallet address using the appropriate fallback.
 
-Added:
+The repository has also had successful CI/build checkpoints before the newest market-data refactor.
 
-- supabase/functions/wallet-auth version 2 with a validate action for existing wallet sessions.
-- api/wgg-protection-prepare.ts as a Vercel serverless function running the Kamino transaction builder outside the browser and outside the Supabase Edge bundle.
-- src/WeekendGapGuardWorkspace.tsx now calls the Vercel protection endpoint with the existing wallet-session token.
-- vercel.json now gives the protection function a longer execution window.
+The main remaining work is runtime verification of the xStocks/Twelve Data path and the complete wallet-action flow.
 
-The Vercel protection endpoint:
+---
 
-1. validates the existing wallet session through wallet-auth
-2. rejects invalid Solana addresses
-3. ignores browser-supplied RPC URLs and uses Solana mainnet directly
-4. reloads the Kamino Main Market and current ledger state
-5. verifies the selected obligation belongs to the authenticated wallet
-6. builds either a Kamino repay or deposit action using fresh state
-7. returns only unsigned instruction data and lookup-table addresses
-8. leaves final signing and submission to the connected wallet
+## 18. Environment requirements
 
-No private key, signing secret, or standing transaction authorization is introduced.
+### Server-side Vercel
 
-The obsolete Supabase wgg-protection-prepare Edge Function source was removed from the repository after the runtime bundle timeout. The browser no longer calls that function.
+Required:
 
-The latest Vercel build is compiling the revised serverless architecture. It must still reach READY before the protection endpoint is considered production-verified.
+`SOLANA_RPC_URL`
 
-## Earnings-risk milestone
+- authenticated/dedicated Solana mainnet RPC;
+- do not use the public Solana RPC for production.
 
-Added `src/lib/wggEarnings.ts`, a pure earnings-risk contract that:
+`SUPABASE_SERVICE_ROLE_KEY`
 
-- accepts only a trusted calendar event
-- normalizes the symbol
-- determines whether the event is within the next five calendar days
-- retains the reported report timing (`before_open`, `after_close`, or `unspecified`)
-- explicitly returns no risk when the event is missing or invalid
-- provides a separate earnings multiplier helper for the existing weekend-risk engine
+- server-only;
+- never expose in browser.
 
-The module deliberately does **not** guess earnings dates and does not yet claim live earnings data. The next step is wiring a server-side calendar adapter and validating its response before enabling the multiplier in production risk output.
+Existing Supabase configuration as required by the deployed functions.
 
-## Next implementation steps
+### Browser
 
-1. Replace the current Pyth-backed WGG price/history adapters with the xStocks-native current-price path and Twelve Data daily-history path.
-2. Verify the revised market-data adapters against real xStock symbols and their underlying tickers.
-3. Verify the new WASM-aware Vercel build reaches READY.
-4. Complete wallet-signature integration for prepared Kamino actions without giving the app any standing authorization.
-5. Add repay preparation alongside the current deposit preparation, including exact debt-reserve price/decimal handling from fresh Kamino state.
-6. Wire a server-side earnings-calendar adapter and treat missing calendar data as unavailable rather than inferred.
-7. Populate `wgg_monitored_positions` from trusted backend checks rather than browser-submitted balances.
-8. Build the Friday monitoring worker and `wgg_alerts` records.
-9. Reuse the existing Telegram connection pattern for opt-in notifications.
-10. Add Surfpool fixtures/cheatcodes for deterministic flagged-position demos.
-11. Run an end-to-end test before using real mainnet funds.
+`VITE_SOLANA_RPC_URL`
 
-## Testing policy
+- authenticated Solana mainnet RPC used for lookup tables and transaction confirmation.
 
-Use Surfpool for deterministic development and demo testing. The first real-mainnet smoke test should use only a minimal amount needed for wallet/signature/transaction-fee validation. Never fabricate a real position in the UI.
+### Historical market data
 
+A server-side Twelve Data credential/configuration will be required once the historical adapter is implemented.
 
-## Native Kamino action milestone — 2026-09-19
+Do not put provider secrets in the React bundle.
 
-Added the first end-to-end native lending control surface.
+### Pyth
 
-- src/KaminoActionConsole.tsx adds Borrow, Lend/Supply, Add Collateral, Repay, Withdraw Collateral, and Close Position controls.
-- api/kamino-market.ts reads the active Kamino Main Market reserve catalog from a server-side dedicated RPC.
-- api/kamino-actions-prepare.ts uses the current klend SDK builders directly: buildDepositReserveLiquidityTxns for pure liquidity supply, buildDepositTxns for collateral, buildBorrowTxns for borrow, buildRepayTxns for repay, buildWithdrawTxns for collateral withdrawal, and buildRepayAndWithdrawTxns for the self-service close flow.
-- Every obligation action reloads the current Kamino Main Market and verifies the obligation belongs to the authenticated wallet before building instructions.
-- Prepared actions are recorded in wgg_platform_actions server-side.
-- api/kamino-actions-verify.ts verifies the confirmed transaction on mainnet, checks the authenticated wallet signer and Kamino program ID, then records the action as confirmed.
-- Verified actions trigger a fresh Kamino xStock position sync into wgg_monitored_positions.
-- No private key, custody, standing authorization, or automatic transaction execution was added.
+`PYTH_API_KEY` is **not required for the current WGG path**.
 
-### Required Vercel server environment
+---
 
-- SOLANA_RPC_URL — dedicated authenticated Solana mainnet RPC; do not use the public Solana endpoint.
-- SUPABASE_SERVICE_ROLE_KEY — server-only Supabase service-role key used only by the action ledger and verification endpoints.
+## 19. Security / custody rules
 
-### Required browser environment
+Non-negotiable:
 
-- VITE_SOLANA_RPC_URL — authenticated Solana mainnet RPC used by the browser to fetch lookup tables and confirm the wallet-signed transaction.
+- no private keys;
+- no custodial funds;
+- no standing transaction permissions;
+- no automatic liquidation;
+- no fabricated position balances;
+- no browser-controlled trusted Kamino state;
+- no browser-controlled wallet ledger writes;
+- no API secrets in frontend bundles;
+- server validates wallet sessions;
+- transaction preparation reloads fresh Kamino state;
+- transaction verification happens after mainnet confirmation;
+- action ledger is server-side.
 
+---
 
-## Market-data architecture decision — 2026-09-19
+## 20. Current UI direction
 
-### Current source-of-truth split
+The WGG workspace should remain:
 
-| Concern | Source |
-| --- | --- |
-| xStock identity, mint, asset metadata | xStocks public API + official xStocks catalog |
-| Solana xStock raw balance | Solana mainnet RPC / Token-2022 |
-| Solana xStock multiplier | xStocks multiplier data / Token-2022 metadata |
-| Current xStock market price | xStocks public asset price-data endpoint |
-| Execution quote/reference when needed | xChange RFQ |
-| Collateral, debt, LTV, liquidation state | Kamino |
-| Historical Friday-close → next-session-open | Twelve Data daily OHLC |
-| Weekend-gap statistics | StockPass WGG engine |
-| Pyth | Deferred/optional; not required for current WGG path |
+- mobile-first;
+- clean;
+- information-dense without being crowded;
+- non-generic / anti-AI-slop;
+- explicit about data provenance;
+- explicit when data is unavailable;
+- free of fake metrics;
+- free of fake balances;
+- focused on "Discover → Assess → Protect".
 
-### xStocks valuation rule
+Important UI concepts:
 
-For Solana Token-2022 xStocks:
-- raw amount is the transaction/on-chain balance
-- displayed/scaled amount = raw amount × current multiplier
-- current equity value must use the xStocks market price
-- corporate-action multipliers must be respected
+- current Kamino position card;
+- liquidation buffer;
+- weekend-gap model;
+- evidence / methodology;
+- protection target;
+- native Kamino action console;
+- transaction review/sign state;
+- monitoring/alert state.
 
-### Non-negotiable data-integrity rule
+---
 
-Do not mix external historical pricing with token-balance authority:
-- xStocks/Solana determines what the user actually owns
-- Kamino determines what is actually collateralized/debt
-- Twelve Data only supplies the historical market series used to model weekend-gap risk
+## 21. Required market-data refactor
 
-### Pyth status
+This is the next major implementation task.
 
-Pyth integration remains in the repository from earlier implementation work, but it is **not the active source-of-truth path** after the 2026-09-19 entitlement test. Future cleanup can remove or archive the Pyth adapters after the xStocks/Twelve Data path is runtime-verified.
+### Replace current Pyth current-price path
 
-### Documentation references
+Current:
 
-- xStocks developer docs: https://docs.xstocks.fi/developers
-- xStocks multiplier docs: https://docs.xstocks.fi/developers/multipliers
-- Twelve Data stock/historical data: https://twelvedata.com/stocks
+`fetchPythPrices()`
+
+Target:
+
+1. resolve official xStock metadata/mapping;
+2. obtain current xStocks price;
+3. obtain Solana Token-2022 raw balance;
+4. obtain multiplier;
+5. calculate current position value;
+6. feed current value into WGG.
+
+### Replace current Pyth weekend-history path
+
+Current:
+
+`fetchWeekendGapSummaries()`
+
+Target:
+
+1. resolve xStock → underlying equity symbol;
+2. fetch Twelve Data daily OHLC;
+3. identify Friday trading dates;
+4. identify the next valid session;
+5. calculate close→open gaps;
+6. calculate statistics;
+7. persist methodology/date window/sample count;
+8. return explicit unavailable state when insufficient.
+
+---
+
+## 22. Recommended historical implementation details
+
+Twelve Data endpoint design can be kept server-side.
+
+The adapter should:
+
+- cache historical responses;
+- avoid refetching the same symbol repeatedly;
+- normalize exchange holidays/weekends;
+- reject malformed provider data;
+- protect against stale/empty datasets;
+- enforce a minimum sample threshold;
+- record the provider symbol used;
+- record first/last date in the model;
+- record the exact methodology string.
+
+The frontend should receive only the calculated result and provenance metadata.
+
+---
+
+## 23. Recommended monitoring worker
+
+Build a trusted backend worker that:
+
+1. finds monitored/opted-in positions;
+2. reloads Kamino state;
+3. obtains xStocks current price/multiplier;
+4. obtains the historical gap profile;
+5. loads validated earnings context;
+6. evaluates WGG;
+7. updates `wgg_monitored_positions`;
+8. inserts deduplicated `wgg_alerts`;
+9. records `wgg_check_runs`;
+10. optionally sends Telegram notifications.
+
+The worker must never trust client-submitted balances.
+
+---
+
+## 24. Friday monitoring
+
+Future scheduled run:
+
+- refresh monitored positions;
+- refresh current xStock prices;
+- recalculate or load cached historical gap statistics;
+- determine risk;
+- create a warning/flagged alert where appropriate;
+- preserve an audit trail of what inputs were used.
+
+A scheduled check must record:
+
+- run type
+- status
+- positions scanned
+- positions flagged
+- model version
+- provider metadata
+- timestamps
+
+---
+
+## 25. Surfpool / demo strategy
+
+Surfpool is the preferred deterministic environment for demo/test scenarios where real mainnet state needs to be forked or simulated.
+
+Use it to demonstrate:
+
+- a real-ish Kamino position state;
+- weekend gap deterioration;
+- WGG alerting;
+- protection preparation;
+- wallet signing flow;
+- post-transaction refresh.
+
+Do not fabricate balances in the production UI.
+
+For any actual mainnet smoke test, use only a controlled test wallet and the minimum amount necessary for signature/transaction validation.
+
+---
+
+## 26. Current source tree milestones
+
+Important live files:
+
+### WGG UI
+- `src/WeekendGapGuardWorkspace.tsx`
+- `src/KaminoActionConsole.tsx`
+- `src/weekend-gap-guard.css`
+
+### WGG domain logic
+- `src/lib/wggRisk.ts`
+- `src/lib/wggEarnings.ts`
+- `src/lib/kamino.ts`
+- `src/lib/walletAuth.ts`
+- `src/lib/walletSession.ts`
+
+### Backend APIs
+- `api/kamino-market.ts`
+- `api/kamino-actions-prepare.ts`
+- `api/kamino-actions-verify.ts`
+- `api/wgg-protection-prepare.ts`
+
+### Supabase
+- `supabase/functions/wallet-auth/`
+- `supabase/functions/wgg-pyth/` (dormant legacy)
+- `supabase/functions/wgg-weekend-gap/` (dormant legacy)
+- WGG migrations under `supabase/migrations/`
+
+### Build
+- `vite.config.wasm.ts`
+- `vercel.json`
+
+---
+
+## 27. Important completed commits
+
+Known implementation commits on `main` include:
+
+- `c77d022127fcbfc05a9ec98c24fec83de28ac20e` — WGG platform-actions migration
+- `2d27ccbd79e88c36fcc1610771b12f5bb4e7d41c` — Kamino market API
+- `c81c9554f4700113c790477ec6dd67de155725ec` — action prepare API
+- `023021b56678939ee8396d0784c29b2665053c4a` — action verify API
+- `e28bc03cc4f7ea3b94e84f320876cab3696d54cf` — Kamino action console
+- `31dafe2f49ffb390c3804c65dfb876f816bdcc65` — WGG action-console integration
+- `1ebae80b12fd310f54d08e7d64c3a3abd9546bfd` — dedicated RPC requirement for protection endpoint
+- `2ce7306c8b5e3b188bd56f76384c7321287c519e` — WGG action console styling
+- `5013fafe4a089364677ba41149938fa832454024` — build documentation update
+- `e9c51538c724ebb867024402a67aabbba6a4048c` — BUILD_INFO documentation update
+- `c4aa4385a8d63f4f8d5093537ef3b00fffeb5dd2` — wallet address type fix
+
+These are historical checkpoints; verify current `main` before applying future changes.
+
+---
+
+## 28. Current blockers / next tasks
+
+Priority order:
+
+1. **Implement xStocks-native current-price adapter.**
+2. **Implement Twelve Data historical OHLC adapter.**
+3. Replace the WGG current-price and weekend-gap calls so Pyth is no longer active.
+4. Add caching and provenance for historical gap datasets.
+5. Verify WGG risk numbers using real supported xStock symbols.
+6. Strengthen exact instruction verification in `api/kamino-actions-verify.ts`.
+7. Finish repay preparation with fresh Kamino debt state.
+8. Wire trusted monitored-position backend worker.
+9. Wire Friday monitoring + alert deduplication.
+10. Wire Telegram opt-in notification flow.
+11. Add deterministic Surfpool demo fixtures.
+12. Run complete end-to-end browser + wallet + Kamino smoke testing.
+13. Re-run production CI/Vercel build after the market-data refactor.
+14. Remove/archive dormant Pyth adapters once the replacement paths are verified.
+
+---
+
+## 29. What must not be changed
+
+- Do not modify the preserved `stockpass` branch.
+- Do not touch AgentMarket infrastructure.
+- Do not add fake balances or fake Kamino state.
+- Do not make Pyth Pro a mandatory dependency.
+- Do not expose API secrets in the browser.
+- Do not let historical-provider data override xStocks/Solana/Kamino state.
+- Do not add automatic liquidation.
+- Do not add custody or private-key storage.
+
+---
+
+## 30. External technical references
+
+xStocks:
+- https://docs.xstocks.fi/developers
+- https://docs.xstocks.fi/developers/multipliers
+- https://xstocks.com/
+
+Kamino:
+- https://docs.kamino.finance/
+- https://github.com/Kamino-Finance/klend-sdk
+
+Historical data:
+- https://twelvedata.com/stocks
+- https://twelvedata.com/docs
+
+Pyth (optional/deferred):
+- https://docs.pyth.network/price-feeds/core
+- https://docs.pyth.network/price-feeds/pro
+
+Solana:
+- https://solana.com/docs
+
+---
+
+## 31. Handoff rule for future chats
+
+When continuing this project from this file:
+
+1. Treat this document as the current architecture checkpoint.
+2. Check the current `main` branch before changing files.
+3. Prefer the actual repository code over stale descriptions in older docs.
+4. Do not resurrect Pyth as the primary market-data source unless a new explicit decision is made.
+5. Keep xStocks, Solana and Kamino as the authoritative operational layers.
+6. Keep Twelve Data isolated to historical risk-model data.
+7. Update this file after every major implementation milestone.
+8. Record actual verification results, not intended behavior.
