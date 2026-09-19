@@ -1,3 +1,8 @@
 {
-  "buildCommand": "tsc --noEmit && vite build --config vite.config.wasm.ts"
+  "buildCommand": "tsc --noEmit && vite build --config vite.config.wasm.ts",
+  "functions": {
+    "api/wgg-protection-prepare.ts": {
+      "maxDuration": 60
+    }
+  }
 }
