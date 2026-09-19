@@ -287,7 +287,8 @@ export default async function handler(req: any, res: any) {
     new Set(
       (Array.isArray(body.symbols) ? body.symbols : [])
         .map(normalizeSymbol)
-        .filter((value: string) => /^[A-Z0-9]{2,12}X?$/.test(value)),
+        .map((value: string) => value.endsWith('X') ? value : `${value}X`)
+        .filter((value: string) => /^[A-Z0-9]{2,12}X$/.test(value)),
     ),
   ).slice(0, MAX_SYMBOLS);
 
