@@ -5,6 +5,9 @@ import { Connection, PublicKey, TransactionInstruction, TransactionMessage, Vers
 import type { KaminoXStockPosition } from './lib/kamino';
 import KaminoActionConsole from './KaminoActionConsole';
 import WggDashboard from './WggDashboard';
+import WggPositionsPage from './WggPositionsPage';
+import WggRiskPage from './WggRiskPage';
+import WggActionsPage from './WggActionsPage';
 import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
 import { fetchWggMarketData, type XStockPriceMap, type WeekendGapMap } from './lib/wggMarketData';
 import { clearWalletSession, refreshWalletSession } from './lib/walletAuth';
@@ -236,10 +239,33 @@ export default function WeekendGapGuardWorkspace() {
 
   const authenticated = isConnected && authStatus === 'authenticated';
 
+  const [route, setRoute] = useState(() => window.location.pathname || '/');
+
+  useEffect(() => {
+    const onPopState = () => setRoute(window.location.pathname || '/');
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    if (window.location.pathname === '/') {
+      window.history.replaceState({}, '', '/app');
+      setRoute('/app');
+    }
+  }, [authenticated]);
+
   useEffect(() => {
     if (!authenticated || lastLoaded || loading) return;
     void scan();
   }, [authenticated, lastLoaded, loading]);
+
+  function navigate(path: string) {
+    if (window.location.pathname === path) return;
+    window.history.pushState({}, '', path);
+    setRoute(path);
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+  }
 
   if (!authenticated) {
     return <div className="wgg-auth-transition">
@@ -256,16 +282,19 @@ export default function WeekendGapGuardWorkspace() {
     </div>;
   }
 
+  const page = route === '/app/positions' ? 'positions' : route === '/app/risk' ? 'risk' : route === '/app/actions' ? 'actions' : 'dashboard';
+
   return <div className="wgg-app">
     <header className="wgg-header sp-app-header">
       <div className="wgg-brand">
         <span className="wgg-mark">SP</span>
         <div><strong>STOCKPASS</strong><small>WEEKEND GAP GUARD</small></div>
       </div>
-      <nav className="sp-header-nav" aria-label="Dashboard sections">
-        <button className="is-active" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>Overview</button>
-        <button onClick={() => document.getElementById('sp-positions')?.scrollIntoView({ behavior: 'smooth' })}>Positions</button>
-        <button onClick={() => document.getElementById('sp-actions')?.scrollIntoView({ behavior: 'smooth' })}>Actions</button>
+      <nav className="sp-header-nav" aria-label="StockPass app">
+        <button className={page === 'dashboard' ? 'is-active' : ''} onClick={() => navigate('/app')}>Overview</button>
+        <button className={page === 'positions' ? 'is-active' : ''} onClick={() => navigate('/app/positions')}>Positions</button>
+        <button className={page === 'risk' ? 'is-active' : ''} onClick={() => navigate('/app/risk')}>Guard</button>
+        <button className={page === 'actions' ? 'is-active' : ''} onClick={() => navigate('/app/actions')}>Actions</button>
       </nav>
       <div className="wgg-header-right">
         <span className="wgg-mainnet"><i /> SOLANA MAINNET</span>
@@ -274,7 +303,7 @@ export default function WeekendGapGuardWorkspace() {
     </header>
 
     <main className="wgg-main sp-main">
-      <WggDashboard
+      {page === 'dashboard' && <WggDashboard
         address={address}
         positions={positions}
         rows={rows}
@@ -290,20 +319,13 @@ export default function WeekendGapGuardWorkspace() {
         scan={scan}
         prepareFix={prepareFix}
         signAndSendPrepared={signAndSendPrepared}
-      />
+      />}
 
-      <div id="sp-actions">
-        <KaminoActionConsole address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />
-      </div>
+      {page === 'positions' && <WggPositionsPage positions={positions} rows={rows} loading={loading} lastLoaded={lastLoaded} scan={scan} />}
 
-      <section className="wgg-explain" id="sp-method">
-        <div><div className="wgg-eyebrow">THE WGG METHOD</div><h2>From price shock<br />to signed action.</h2></div>
-        <div className="wgg-steps">
-          <article><b>01</b><strong>Read</strong><span>Load the real Kamino obligation and the current xStock market context.</span></article>
-          <article><b>02</b><strong>Stress</strong><span>Apply the historical downside gap to the live LTV and compare the stressed result with liquidation.</span></article>
-          <article><b>03</b><strong>Protect</strong><span>Prepare the amount needed to bring the position back under the scenario target, then let the wallet sign.</span></article>
-        </div>
-      </section>
+      {page === 'risk' && <WggRiskPage rows={rows} counts={counts} prepareFix={prepareFix} preparing={preparing} authenticating={authenticating} />}
+
+      {page === 'actions' && <WggActionsPage address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
 
       <footer className="wgg-footer">
         <span>StockPass / Weekend Gap Guard</span>
