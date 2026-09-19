@@ -221,7 +221,7 @@ export default function WggMonitoringPage({ address }: Props) {
               {!linked && <ExternalLink size={14} className="text-mute" />}
             </button>
           ) : (
-            <div className="sp-empty-inline">Telegram handoff is unavailable because VITE_TELEGRAM_BOT_USERNAME is not configured.</div>
+            <div className="sp-empty-inline">Telegram alerts are not configured yet. Add the StockPass Telegram bot username to enable the one-time wallet handoff.</div>
           )}
         </div>
       </section>
