@@ -146,7 +146,7 @@ export default function WeekendGapGuardWorkspace() {
       });
       const data = await response.json().catch(() => null) as { token?: string; error?: string } | null;
       if (!response.ok || !data?.token) throw new Error(data?.error ?? 'Could not create a Telegram link.');
-      window.open(`https://t.me/${TELEGRAM_BOT_USERNAME}?start=link_${encodeURIComponent(data.token)}`, '_blank', 'noopener,noreferrer');
+      window.location.assign(`https://t.me/${TELEGRAM_BOT_USERNAME}?start=link_${encodeURIComponent(data.token)}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Telegram linking failed.');
     } finally {
