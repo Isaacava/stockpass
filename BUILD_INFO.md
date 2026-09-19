@@ -56,7 +56,8 @@ It does not replace Kamino, custody funds, hold private keys, or give the applic
 ### Secrets/configuration still required
 
 - Server-side PYTH_API_KEY
-- Production VITE_SOLANA_RPC_URL if a dedicated RPC is used
+- Production `SOLANA_RPC_URL` for the protected Vercel function when a dedicated RPC is available
+- Production `VITE_SOLANA_RPC_URL` for browser mainnet reads when a dedicated RPC is used
 - Telegram bot configuration when notification work is enabled
 - Any server-side provider credentials needed by future monitoring adapters
 
@@ -514,10 +515,20 @@ Supabase hosts:
 - browser transaction reconstruction
 - Reown wallet signing bridge
 - transaction submission and confirmation UI
+- WGG-only TypeScript build graph
+- removal of unused WGG V2 / duplicate Kamino protection modules
 - WASM-aware Vite build configuration
 - WGG Supabase tables
 - WGG project documentation table
 - complete GitHub build documentation
+
+### Current verification state
+
+As of 2026-09-19, the live WGG code path has been cleaned up and the protection endpoint now accepts server-side RPC configuration through `SOLANA_RPC_URL` instead of relying only on the public Solana RPC.
+
+The `main` branch no longer includes the unreferenced `WeekendGapGuardWorkspaceV2.tsx`, `kaminoProtection.ts`, `wggKamino.ts`, or `WalletAuthGate.tsx` files. TypeScript now targets the live WGG source graph so legacy StockPass UI code cannot block the WGG build.
+
+The latest Vercel deployment is still processing, so the WGG build is **not yet marked READY**. The next verification gate is a successful Vercel build followed by one real wallet-authenticated protection-prepare pass.
 
 ### In progress
 
