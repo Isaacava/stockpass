@@ -4,7 +4,7 @@ import { useAppKit, useAppKitAccount, useAppKitProvider } from '@reown/appkit/re
 import type { Provider } from '@reown/appkit-adapter-solana';
 import { Connection, PublicKey, TransactionInstruction, TransactionMessage, VersionedTransaction } from '@solana/web3.js';
 import { discoverKaminoXStockPositions, type KaminoXStockPosition } from './lib/kamino';
-import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
+import { calculateCollateralUsdForTargetLtv, calculateRepayUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
 import { fetchPythPrices, fetchWeekendGapSummaries, type PythPriceMap, type WeekendGapMap } from './lib/pyth';
 import { supabase } from './lib/supabase';
 import { refreshWalletSession } from './lib/walletAuth';
@@ -96,7 +96,7 @@ export default function WeekendGapGuardWorkspace() {
     } finally { setLoading(false); }
   }
 
-  async function prepareFix(row: Row) {
+  async function prepareFix(row: Row, kind: 'deposit' | 'repay') {
     if (!address || !row.price || !row.gap || row.position.liquidationLtvPct == null || row.position.liquidationBufferPct == null) return;
     const typicalGap = row.gap.typicalWeekendGapPct ?? 0;
     const risk = evaluateWeekendRisk({ currentBufferPct: row.position.liquidationBufferPct, typicalWeekendGapPct: typicalGap });
@@ -104,8 +104,12 @@ export default function WeekendGapGuardWorkspace() {
     const targetLtvPct = Math.max(1, row.position.liquidationLtvPct - risk.adjustedGapPct * 1.2);
     const neededUsd = calculateCollateralUsdForTargetLtv(row.position.borrowValueUsd ?? 0, row.position.depositValueUsd ?? 0, targetLtvPct);
     const tokenAmount = neededUsd / row.price.price;
-    const amountBaseUnits = BigInt(Math.ceil(tokenAmount * 10 ** row.stock.mintDecimals)).toString();
-    if (amountBaseUnits === '0') return;
+    const amountBaseUnits = kind === 'deposit'
+      ? BigInt(Math.ceil(tokenAmount * 10 ** row.stock.mintDecimals)).toString()
+      : '';
+    if (kind === 'deposit' && amountBaseUnits === '0') return;
+
+    const targetLtvPct = Math.max(1, row.position.liquidationLtvPct - risk.adjustedGapPct * 1.2);
     setPreparing(true); setAuthenticating(true); setError(''); setPrepared(null); setSignature('');
     try {
       if (!walletProvider?.signMessage) throw new Error('Connected wallet does not support message signing.');
@@ -122,16 +126,33 @@ export default function WeekendGapGuardWorkspace() {
         body: JSON.stringify({
           wallet: address,
           obligationAddress: row.position.obligation,
-          reserveAddress: row.stock.reserve,
+          reserveAddress: kind === 'repay'
+            ? (row.position.debts[0]?.reserve ?? '')
+            : row.stock.reserve,
           amountBaseUnits,
-          kind: 'deposit',
+          targetLtvPct,
+          kind,
         }),
       });
-      const data = await response.json().catch(() => null) as { error?: string; instructions?: PreparedInstruction[]; lookupTables?: string[] } | null;
+      const data = await response.json().catch(() => null) as {
+        error?: string;
+        instructions?: PreparedInstruction[];
+        lookupTables?: string[];
+        amountBaseUnits?: string;
+        repayUsd?: number;
+        targetLtvPct?: number;
+      } | null;
       if (!response.ok) throw new Error(data?.error ?? 'Protection preparation failed.');
       const payload = data;
       if (!payload?.instructions?.length) throw new Error('Protection service returned no instructions.');
-      setPrepared({ symbol: row.symbol, amountBaseUnits, instructionCount: payload.instructions.length, instructions: payload.instructions, lookupTables: payload.lookupTables ?? [] });
+      if (kind === 'repay' && !data?.amountBaseUnits) throw new Error('Protection service returned no computed repay amount.');
+      setPrepared({
+        symbol: kind === 'repay' ? (row.position.debts[0]?.mint ?? 'Debt') : row.symbol,
+        amountBaseUnits: data?.amountBaseUnits ?? amountBaseUnits,
+        instructionCount: payload.instructions.length,
+        instructions: payload.instructions,
+        lookupTables: payload.lookupTables ?? [],
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Protection preparation is not available yet.');
     } finally { setPreparing(false); setAuthenticating(false); }
@@ -189,7 +210,14 @@ export default function WeekendGapGuardWorkspace() {
             <div className="wgg-xstock-list">{position.xStocks.map((stock) => {
               const row = rows.find((candidate) => candidate.position.obligation === position.obligation && candidate.stock.mint === stock.mint);
               const risk = row?.risk;
-              return <div className="wgg-xstock-row" key={`${position.obligation}-${stock.mint}`}><span className="wgg-xstock-icon">{row?.symbol.slice(0, 4)}</span><div><strong>{stock.symbol}</strong><span>{stock.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} collateral units</span></div><div className="wgg-xstock-status"><span>{row?.price ? `$${row.price.price.toFixed(2)} Pyth` : 'Pyth pending'}</span>{risk && <strong>{risk.status.toUpperCase()}</strong>}</div>{row && risk?.status === 'flagged' && <button className="wgg-secondary" onClick={() => void prepareFix(row)} disabled={preparing}>{preparing ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} {authenticating ? 'Verify wallet' : 'Prepare fix'}</button>}</div>;
+              return <div className="wgg-xstock-row" key={`${position.obligation}-${stock.mint}`}><span className="wgg-xstock-icon">{row?.symbol.slice(0, 4)}</span><div><strong>{stock.symbol}</strong><span>{stock.amount.toLocaleString(undefined, { maximumFractionDigits: 6 })} collateral units</span></div><div className="wgg-xstock-status"><span>{row?.price ? `$${row.price.price.toFixed(2)} Pyth` : 'Pyth pending'}</span>{risk && <strong>{risk.status.toUpperCase()}</strong>}</div>{row && risk?.status === 'flagged' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+  <button className="wgg-secondary" onClick={() => void prepareFix(row, 'deposit')} disabled={preparing}>
+    {preparing ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} {authenticating ? 'Verify wallet' : 'Add collateral'}
+  </button>
+  {row.position.debts.length > 0 && <button className="wgg-secondary" onClick={() => void prepareFix(row, 'repay')} disabled={preparing}>
+    {preparing ? <LoaderCircle size={13} className="wgg-spin" /> : <ShieldCheck size={13} />} {authenticating ? 'Verify wallet' : 'Prepare repay'}
+  </button>}
+</div>}</div>;
             })}</div>
             <div className="wgg-position-metrics"><div><span>Liquidation LTV</span><strong>{position.liquidationLtvPct != null ? `${position.liquidationLtvPct.toFixed(2)}%` : '—'}</strong></div><div><span>Current buffer</span><strong>{position.liquidationBufferPct != null ? `${position.liquidationBufferPct.toFixed(2)} pts` : '—'}</strong></div><div><span>Typical weekend gap</span><strong>{leadGap?.typicalWeekendGapPct != null ? `${leadGap.typicalWeekendGapPct.toFixed(2)}%` : '—'}</strong></div><div><span>Borrow value</span><strong>{position.borrowValueUsd != null ? `$${position.borrowValueUsd.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : '—'}</strong></div></div>
           </article>;
