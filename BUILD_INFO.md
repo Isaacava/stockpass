@@ -877,3 +877,10 @@ The authenticated StockPass/WGG workspace has been redesigned around the supplie
 - Updated Vite environment declarations for the Supabase and Solana variables used by the frontend.
 
 The latest source commit before this documentation change is 9913e1f69cda690c2339f0fbef9620f3f1dfb05a. The currently reported Vercel status is still the deployment-rate-limit failure from the rapid deployment sequence; this does not independently verify the latest source as READY.
+
+
+### Deployment compile fix — 2026-09-19
+
+Vercel build `dpl_9FdQB8hPSRZVqtproxSbqXCsQ4mk` stopped at TypeScript compilation in `src/WggMonitoringPage.tsx`. The npm `ERESOLVE` output was peer-dependency warnings; the fatal errors were caused by an untyped array containing Lucide icon components being rendered as `ReactNode`.
+
+Fixed by typing the monitoring pipeline metadata as `[LucideIcon, string, string][]` and importing the `LucideIcon` type. Fix commit: `86b2965cff371dee78c1f219e05aeb4667a8da0f`.
