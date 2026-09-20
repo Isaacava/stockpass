@@ -136,7 +136,7 @@ export default async function handler(req: any, res: any) {
     }
 
     const signerPresent = tx.transaction.message.accountKeys.some(
-      (key) => key.pubkey.toBase58() === wallet && key.signer,
+      (key: { pubkey: { toBase58(): string }; signer: boolean }) => key.pubkey.toBase58() === wallet && key.signer,
     );
     const actualKaminoInstructions = tx.transaction.message.instructions
       .filter((instruction: any) => String(instruction.programId || '') === KAMINO_PROGRAM_ID)
