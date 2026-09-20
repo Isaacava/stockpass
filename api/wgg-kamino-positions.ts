@@ -1,5 +1,5 @@
 
-import { discoverKaminoXStockPositions } from '../src/lib/kamino';
+import { discoverKaminoXStockPositions } from '../src/lib/kamino.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY =
