@@ -856,7 +856,6 @@ When continuing this project from this file:
   - typed xStocks current-price response
   - typed Twelve Data weekend-gap summary
 - `src/WeekendGapGuardWorkspace.tsx`
-  - no longer calls `fetchPythPrices()`
   - requests official xStock symbols such as `AAPLx`/ `NVDAx`
   - displays xStocks as the current-price source
   - displays explicit historical-data errors/unavailable states
