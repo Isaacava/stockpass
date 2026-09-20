@@ -1,4 +1,4 @@
-import type { StockAsset } from './assets';
+import type { StockAsset } from './assets.js';
 
 const XSTOCKS_API = 'https://api.xstocks.fi/api/v2/public';
 
