@@ -31,7 +31,6 @@
     "src/reown-hardcoded.ts",
     "src/lib/assets.ts",
     "src/lib/kamino.ts",
-    "src/lib/pyth.ts",
     "src/lib/wggMarketData.ts",
     "src/lib/supabase.ts",
     "src/lib/walletAuth.ts",
