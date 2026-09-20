@@ -1,5 +1,42 @@
 # Weekend Gap Guard — Complete Build Information
 
+## Current authoritative runtime state — 2026-09-20
+
+This section supersedes older checkpoint notes in this file wherever they conflict with the live repository or live Supabase/Vercel configuration.
+
+### Verified repository/runtime facts
+
+- The active `main` branch is Weekend Gap Guard. The preserved `stockpass` branch and the separate AgentMarket system are outside this build.
+- Current xStock market pricing in the active WGG path comes from the official xStocks public asset API.
+- Historical Friday-close → next-session-open context in the active WGG path comes from Twelve Data.
+- Pyth is **not** a required dependency of the current WGG critical path. The legacy `wgg-pyth` function remains deployed, but any Pyth integration must follow the post-August-26-2026 authentication rules and must never be treated as configured without a valid server-side key.
+- Browser Solana RPC is same-origin `/api/solana-rpc`. The upstream provider credential is server-only in Vercel as `SOLANA_RPC_URL`. There is no required `VITE_SOLANA_RPC_URL` in the current browser architecture.
+- The RPC proxy now rejects non-browser same-origin requests, JSON-RPC batch requests, oversized bodies, and methods outside the explicit allowlist used by the application.
+- `src/lib/assets.ts` is isomorphic: Vercel Node functions read server environment values while the Vite browser build falls back to `import.meta.env`.
+- `tsconfig.api.json` type-checks every `api/**/*.ts` server function independently. Both the normal package build and Vercel build run this API typecheck before the production Vite build.
+- Kamino discovery lazy-loads the Kamino SDK inside the discovery call so serverless module initialization can fail as a handled request error rather than an opaque import-time crash.
+- Protection repay preparation uses Kamino's `obligation.getBorrows()` accessor and reads the live mainnet RPC from `SOLANA_RPC_URL`.
+- The monitor risk calculation uses the same `currentLtvPct`, `liquidationLtvPct`, downside-gap stress, and target-LTV calculation as the connected dashboard.
+- The existing browser transaction path decodes prepared instruction bytes with `Buffer.from(...)` before creating `TransactionInstruction` objects.
+- Supabase live inspection on 2026-09-20 confirmed the WGG persistence tables exist and are RLS-enabled: `wgg_monitored_positions`, `wgg_alerts`, `wgg_telegram_links`, `wgg_check_runs`, `wgg_platform_actions`, and `wgg_telegram_link_challenges`. They currently contain no monitored/action rows, so no usage or risk history should be presented as real until an authenticated mainnet flow generates it.
+- Supabase live inspection also confirmed `alerts-worker` and `telegram-webhook` are ACTIVE Edge Functions. They should not be duplicated or blindly redeployed just because older audit notes said they might be missing.
+- The native Actions surface already exposes Create Position, Supply, Borrow, Add Collateral, Repay, Withdraw, and self-service Close. The platform-action ledger exists in Supabase, but the production definition of done still requires independent on-chain verification after a real wallet transaction.
+- No third-party liquidation scanner/bot is part of the build. "Close" means the user's own position: repay debt and withdraw their own collateral.
+
+### Fix-first gate
+
+The audit patch supplied on 2026-09-20 has been applied to `main` across the server-safe asset registry, API typechecking, Kamino borrow accessor, WGG monitor risk inputs, target-LTV math, RPC hardening, and related build configuration.
+
+The remaining proof gate is empirical, not another UI rewrite: a READY Vercel deployment of the current `main`, followed by a real connected-wallet pass proving authentication → Kamino discovery → xStocks pricing → weekend-gap history → WGG risk → prepared action → wallet signature → mainnet confirmation → platform verification → monitoring persistence.
+
+Until that real-wallet pass is observed, production success must not be described as confirmed.
+
+### External scope verification
+
+As of the current STOCKLANA schedule, the live hackathon remains active. The deadline has been extended to **September 25, 2026 at 4 PM ET**. The program now has the main track plus sponsored tracks from Meteora, Pyth Network, PreStocks, Clawpump, and Tessera. The hackathon platform allows a submission to select up to three sponsor tracks, while judging is split between the main-track judges and the relevant sponsor judges.
+
+The current product continues to target the main STOCKLANA brief with a real xStock/Kamino position-protection workflow rather than replacing the lending protocol or inventing balances.
+
 ## Project
 
 Weekend Gap Guard (WGG) is the new STOCKLANA hackathon project on the main branch of the repository "Isaacava/stockpass".
