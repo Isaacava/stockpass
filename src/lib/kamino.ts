@@ -1,5 +1,5 @@
-import { SERVER_STOCKS } from './serverAssets';
-import { resolveOfficialStocks } from './xstocks';
+import { SERVER_STOCKS } from './serverAssets.js';
+import { resolveOfficialStocks } from './xstocks.js';
 
 export const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 
