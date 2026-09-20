@@ -1,7 +1,11 @@
 import { SERVER_STOCKS } from './serverAssets.js';
+import { COMPUTE_BUDGET_PROGRAM_ADDRESS } from '@solana-program/compute-budget';
 import { resolveOfficialStocks } from './xstocks.js';
 
 export const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
+
+// Explicitly retain the Kamino runtime dependency in the serverless bundle.
+const KAMINO_COMPUTE_BUDGET_PROGRAM = COMPUTE_BUDGET_PROGRAM_ADDRESS;
 
 type GenericPosition = {
   reserveAddress?: unknown;
@@ -91,6 +95,7 @@ function reserveLiquidationLtvPct(reserve: unknown) {
  */
 export async function discoverKaminoXStockPositions(wallet: string, rpcUrl: string): Promise<KaminoXStockPosition[]> {
   if (!wallet) return [];
+  if (!KAMINO_COMPUTE_BUDGET_PROGRAM) throw new Error('Kamino Compute Budget dependency is unavailable.');
 
   const { address, createSolanaRpc } = await import('@solana/kit');
   const {
