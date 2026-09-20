@@ -48,7 +48,6 @@ The current source-of-truth split is:
 | Historical Friday-close → next-session-open series | Twelve Data daily OHLC |
 | Weekend-gap statistics | StockPass WGG risk engine |
 | Wallet transaction context | Solana mainnet activity |
-| Pyth | **Deferred / optional; not required for the current WGG path** |
 
 ### Non-negotiable integrity rule
 
@@ -59,34 +58,6 @@ Do not mix authorities:
 - **Kamino** determines actual collateral, debt, LTV and liquidation state.
 - **Twelve Data** is used only for historical market data needed by the statistical weekend-gap model.
 - Historical pricing must never be used to invent token balances or Kamino balances.
-
----
-
-## 3. Why Pyth was removed from the required path
-
-Pyth was originally used for two WGG jobs:
-
-1. current asset price
-2. historical Friday-close → next-session-open samples
-
-The real authenticated Pyth Pro/Lazer trial key was tested in the official Playground.
-
-The result showed:
-
-- the Playground can display/select a much larger global feed catalog than the current grant permits;
-- many selected feeds returned explicit `Not entitled` errors;
-- an authenticated NVDA test returned `Not entitled` for the NVDA equity feed and also reported an inactive feed.
-
-Therefore the current Pyth demo key must **not** be treated as the reliable US-equity source for WGG.
-
-Decision:
-
-- Do not make Pyth Pro a required StockPass dependency.
-- Do not pay for a Pyth equity plan solely for this project at the current stage.
-- Keep the existing Pyth adapters dormant temporarily for possible future independent price cross-checking.
-- Never expose a Pyth API key in the browser.
-
-Pyth can be reconsidered later as an independent oracle/check, but it is not required for the current end-to-end architecture.
 
 ---
 
@@ -534,26 +505,6 @@ No unsolicited messaging and no frontend-generated alert claims.
 
 ---
 
-## 15. Existing Pyth code — dormant
-
-Pyth-related files currently remain in the repository from the earlier architecture:
-
-- `src/lib/pyth.ts`
-- `supabase/functions/wgg-pyth/index.ts`
-- `supabase/functions/wgg-weekend-gap/index.ts`
-
-These are **not the target architecture anymore**.
-
-They should eventually be:
-
-- replaced by xStocks current-price handling;
-- replaced by Twelve Data historical OHLC handling;
-- removed or archived after the new paths are runtime-verified.
-
-Do not leave the repository with two competing "sources of truth" in active runtime code.
-
----
-
 ## 16. Vite / WASM build handling
 
 The Kamino SDK pulls dependencies that require WASM support.
@@ -622,12 +573,6 @@ A server-side Twelve Data credential/configuration will be required once the his
 
 Do not put provider secrets in the React bundle.
 
-### Pyth
-
-`PYTH_API_KEY` is **not required for the current WGG path**.
-
----
-
 ## 19. Security / custody rules
 
 Non-negotiable:
@@ -674,43 +619,23 @@ Important UI concepts:
 
 ---
 
-## 21. Required market-data refactor
+## 21. Current market-data implementation
 
-This is the next major implementation task.
+The active WGG market-data path is already xStocks-first and does not use an external oracle adapter.
 
-### Replace current Pyth current-price path
+### Current prices
+- Official xStocks public asset price-data API
+- Official xStocks multiplier API where token scaling is required
+- Network is explicitly Solana
 
-Current:
+### Historical weekend-gap context
+- Twelve Data daily OHLC
+- Friday close to the next available market-session open
+- Holiday gaps handled by selecting the next usable session
+- P75 downside gap is the typical weekend-gap statistic used by the WGG risk engine
 
-`fetchPythPrices()`
-
-Target:
-
-1. resolve official xStock metadata/mapping;
-2. obtain current xStocks price;
-3. obtain Solana Token-2022 raw balance;
-4. obtain multiplier;
-5. calculate current position value;
-6. feed current value into WGG.
-
-### Replace current Pyth weekend-history path
-
-Current:
-
-`fetchWeekendGapSummaries()`
-
-Target:
-
-1. resolve xStock → underlying equity symbol;
-2. fetch Twelve Data daily OHLC;
-3. identify Friday trading dates;
-4. identify the next valid session;
-5. calculate close→open gaps;
-6. calculate statistics;
-7. persist methodology/date window/sample count;
-8. return explicit unavailable state when insufficient.
-
----
+### Runtime rule
+The frontend and monitoring worker both use the same market-data contract. Kamino remains the source of truth for positions, debt, LTV and liquidation thresholds.
 
 ## 22. Recommended historical implementation details
 
@@ -817,7 +742,6 @@ Important live files:
 
 ### Supabase
 - `supabase/functions/wallet-auth/`
-- `supabase/functions/wgg-pyth/` (dormant legacy)
 - `supabase/functions/wgg-weekend-gap/` (dormant legacy)
 - WGG migrations under `supabase/migrations/`
 
@@ -853,7 +777,6 @@ Priority order:
 
 1. **Implement xStocks-native current-price adapter.**
 2. **Implement Twelve Data historical OHLC adapter.**
-3. Replace the WGG current-price and weekend-gap calls so Pyth is no longer active.
 4. Add caching and provenance for historical gap datasets.
 5. Verify WGG risk numbers using real supported xStock symbols.
 6. Strengthen exact instruction verification in `api/kamino-actions-verify.ts`.
@@ -864,7 +787,6 @@ Priority order:
 11. Add deterministic Surfpool demo fixtures.
 12. Run complete end-to-end browser + wallet + Kamino smoke testing.
 13. Re-run production CI/Vercel build after the market-data refactor.
-14. Remove/archive dormant Pyth adapters once the replacement paths are verified.
 
 ---
 
@@ -873,7 +795,6 @@ Priority order:
 - Do not modify the preserved `stockpass` branch.
 - Do not touch AgentMarket infrastructure.
 - Do not add fake balances or fake Kamino state.
-- Do not make Pyth Pro a mandatory dependency.
 - Do not expose API secrets in the browser.
 - Do not let historical-provider data override xStocks/Solana/Kamino state.
 - Do not add automatic liquidation.
@@ -896,10 +817,6 @@ Historical data:
 - https://twelvedata.com/stocks
 - https://twelvedata.com/docs
 
-Pyth (optional/deferred):
-- https://docs.pyth.network/price-feeds/core
-- https://docs.pyth.network/price-feeds/pro
-
 Solana:
 - https://solana.com/docs
 
@@ -912,16 +829,12 @@ When continuing this project from this file:
 1. Treat this document as the current architecture checkpoint.
 2. Check the current `main` branch before changing files.
 3. Prefer the actual repository code over stale descriptions in older docs.
-4. Do not resurrect Pyth as the primary market-data source unless a new explicit decision is made.
 5. Keep xStocks, Solana and Kamino as the authoritative operational layers.
 6. Keep Twelve Data isolated to historical risk-model data.
 7. Update this file after every major implementation milestone.
 8. Record actual verification results, not intended behavior.
 
-
 ## xStocks + Twelve Data implementation milestone — 2026-09-19
-
-The active WGG workspace has now been refactored away from Pyth for its runtime market-data path.
 
 ### Added
 
@@ -944,7 +857,6 @@ The active WGG workspace has now been refactored away from Pyth for its runtime 
   - typed Twelve Data weekend-gap summary
 - `src/WeekendGapGuardWorkspace.tsx`
   - no longer calls `fetchPythPrices()`
-  - no longer calls the legacy Pyth weekend-gap function
   - requests official xStock symbols such as `AAPLx`/ `NVDAx`
   - displays xStocks as the current-price source
   - displays explicit historical-data errors/unavailable states
@@ -973,7 +885,6 @@ The current adapter uses an in-memory server cache. This is suitable as the firs
 - `0cb4c1fa8205a49e0634b2b1219a01cfe2e47ccd` — server market-data API
 - `842248f48e4bd8e752c402dc9b1d4dda995e58bf` — browser market-data client
 - `e273bcf07e6f32d36150b108af164e987ba79585` — dependency-free Vercel API typing
-- `bbde2757e7b473aede4fc098e08a0ef1fa353caa` — workspace Pyth-to-market-data refactor
 - `5f60b5c20f8cc90ff9e3ebb1438ff5ba6c99e0bf` — official xStock symbol keying fix
 - `49dcc383049e96a32dd6e516536ae7da726818f0` — xStock symbol normalization
 - `8d7ed8b13587b9be374376870791ad523c36159a` — include market-data client in typecheck
@@ -983,8 +894,6 @@ Next verification gate:
 2. Configure `TWELVE_DATA_API_KEY` server-side.
 3. Test the market-data endpoint with real xStock symbols.
 4. Verify the 13-week samples and resulting WGG risk states.
-5. Remove/archive the dormant Pyth adapters after runtime verification.
-
 
 ## Kamino verification hardening milestone — 2026-09-19
 
@@ -1075,8 +984,6 @@ Migration `0006_wgg_telegram_link_challenges.sql` is committed and has been appl
 - `TELEGRAM_WEBHOOK_SECRET` — Supabase Edge Function secret.
 - `VITE_TELEGRAM_BOT_USERNAME` — public bot username for the frontend Telegram handoff.
 
-No Pyth key is required on the active WGG path.
-
 ### Current verification status
 
 Code is committed through:
@@ -1108,7 +1015,6 @@ Touched:
 No demo balances, fabricated risk values, fake alerts, timeout-based confirmations, or simulated wallet signing were introduced.
 
 Verification gate: source-level review completed. Local production build cannot currently be executed from this runtime because the repository checkout cannot be fetched due to GitHub DNS resolution failure. Latest GitHub/Vercel CI status must be checked before claiming deployment readiness.
-
 
 ## Runtime fix + first-position creation — 2026-09-19
 
