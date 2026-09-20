@@ -1,5 +1,5 @@
 {
-  "buildCommand": "tsc --noEmit && tsc -p tsconfig.api.json && vite build --config vite.config.wasm.ts",
+  "buildCommand": "node --input-type=module -e \"await import('@solana-program/compute-budget'); await import('@kamino-finance/klend-sdk'); console.log('Kamino runtime dependencies OK')\" && tsc --noEmit && tsc -p tsconfig.api.json && vite build --config vite.config.wasm.ts",
   "functions": {
     "api/wgg-protection-prepare.ts": {
       "maxDuration": 60
