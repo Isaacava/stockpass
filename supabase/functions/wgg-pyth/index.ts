@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-// Pyth Core was upgraded on 2026-08-26. Use the upgraded Hermes service and authenticate with the server-side API key.\nconst PYTH_BASE = "https://pyth.dourolabs.app/hermes";
+// Pyth Core was upgraded on 2026-08-26. Use the upgraded Hermes service and authenticate with the server-side API key.
+const PYTH_BASE = "https://pyth.dourolabs.app/hermes";
 const DEFAULT_FEEDS: Record<string, string> = {};
 
 type PythParsed = {
