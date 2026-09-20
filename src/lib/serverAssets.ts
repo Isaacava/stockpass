@@ -1,4 +1,4 @@
-import type { StockAsset } from './assets';
+import type { StockAsset } from './assets.js';
 
 export const SERVER_STOCKS: StockAsset[] = [
   { symbol: 'AAPLx', name: 'Apple', icon: 'AAPL', mint: '', source: 'xStocks' },
