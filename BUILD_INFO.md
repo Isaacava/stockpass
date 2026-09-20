@@ -8,8 +8,8 @@ This section supersedes older checkpoint notes in this file wherever they confli
 
 - The active `main` branch is Weekend Gap Guard. The preserved `stockpass` branch and the separate AgentMarket system are outside this build.
 - Current xStock market pricing in the active WGG path comes from the official xStocks public asset API.
+- Historical weekend-gap context in the active WGG path comes from Twelve Data daily OHLC.
 - Historical Friday-close → next-session-open context in the active WGG path comes from Twelve Data.
-- Pyth is **not** a required dependency of the current WGG critical path. The legacy `wgg-pyth` function remains deployed, but any Pyth integration must follow the post-August-26-2026 authentication rules and must never be treated as configured without a valid server-side key.
 - Browser Solana RPC is same-origin `/api/solana-rpc`. The upstream provider credential is server-only in Vercel as `SOLANA_RPC_URL`. There is no required `VITE_SOLANA_RPC_URL` in the current browser architecture.
 - The RPC proxy now rejects non-browser same-origin requests, JSON-RPC batch requests, oversized bodies, and methods outside the explicit allowlist used by the application.
 - `src/lib/assets.ts` is isomorphic: Vercel Node functions read server environment values while the Vite browser build falls back to `import.meta.env`.
@@ -33,8 +33,6 @@ Until that real-wallet pass is observed, production success must not be describe
 
 ### External scope verification
 
-As of the current STOCKLANA schedule, the live hackathon remains active. The deadline has been extended to **September 25, 2026 at 4 PM ET**. The program now has the main track plus sponsored tracks from Meteora, Pyth Network, PreStocks, Clawpump, and Tessera. The hackathon platform allows a submission to select up to three sponsor tracks, while judging is split between the main-track judges and the relevant sponsor judges.
-
 The current product continues to target the main STOCKLANA brief with a real xStock/Kamino position-protection workflow rather than replacing the lending protocol or inventing balances.
 
 ## Project
@@ -56,7 +54,6 @@ It does not replace Kamino, custody funds, hold private keys, or give the applic
 3. Read the wallet's real Kamino Main Market obligations.
 4. Identify supported xStock collateral from the official xStock catalog.
 5. Read collateral amounts, debt, LTV, liquidation threshold and related Kamino state.
-6. Get independent Pyth pricing for the underlying equity.
 7. Calculate a historical Friday-close to next-session-open downside gap.
 8. Combine current liquidation buffer with the weekend-gap model.
 9. Apply earnings risk when a trusted earnings event is available.
@@ -78,7 +75,6 @@ It does not replace Kamino, custody funds, hold private keys, or give the applic
 - Kamino Main Market
 - Current Kamino lending SDK
 - Official xStock asset/mint catalog
-- Pyth price data
 - Historical market observations for weekend-gap modeling
 - Solana wallet connection and message signing
 - Wallet session authentication
@@ -147,7 +143,6 @@ Secrets must never be embedded in the browser bundle.
 
 - src/lib/wggRisk.ts
 - src/lib/wggEarnings.ts
-- src/lib/pyth.ts
 - src/lib/kamino.ts
 - src/lib/xstocks.ts
 - src/lib/assets.ts
@@ -165,7 +160,6 @@ Secrets must never be embedded in the browser bundle.
 ### Supabase functions
 
 - supabase/functions/wallet-auth/index.ts
-- supabase/functions/wgg-pyth/index.ts
 - supabase/functions/wgg-weekend-gap/index.ts
 
 ### Build configuration
@@ -199,36 +193,6 @@ The application:
 The displayed liquidation buffer is a WGG protection signal, not a replacement for Kamino's liquidation engine.
 
 The first-pass calculation uses the lowest applicable xStock liquidation threshold minus current account LTV.
-
-## Pyth integration
-
-Pyth is intentionally server-side for authenticated/protected access.
-
-### Live pricing
-
-wgg-pyth:
-
-1. Receives underlying equity symbols.
-2. Resolves the current equity feed.
-3. Fetches the latest parsed price update.
-4. Converts Pyth fixed-point values into normal USD prices.
-5. Returns price, confidence, publish time and feed ID.
-
-The API key is never placed in the frontend.
-
-### Historical weekend-gap model
-
-wgg-weekend-gap:
-
-1. Uses a Friday near-close observation around 15:59 America/New_York.
-2. Finds the next available weekday session observation around 09:30 America/New_York.
-3. Handles market-holiday gaps by finding the next usable weekday observation.
-4. Calculates max(0, -return).
-5. Returns sample count, median downside gap, P75 downside gap, P90 downside gap, maximum downside gap, date window, methodology and feed ID.
-
-The initial WGG model uses the P75 downside gap as the typical weekend-gap estimate.
-
-No historical number should be fabricated when source data is unavailable.
 
 ## Earnings-risk integration
 
@@ -410,11 +374,7 @@ Purpose:
 - create wallet sessions
 - validate existing wallet sessions
 
-### wgg-pyth
-
 Purpose:
-
-- protected current Pyth pricing adapter
 
 ### wgg-weekend-gap
 
@@ -439,7 +399,6 @@ The current WGG interface includes:
 - scan action
 - real Kamino obligation discovery
 - real xStock collateral rows
-- Pyth price display
 - LTV and liquidation metrics
 - weekend-gap metrics
 - risk status
@@ -451,7 +410,6 @@ The current WGG interface includes:
 The UI clearly distinguishes:
 
 - source-of-truth Kamino state
-- independent Pyth price data
 - historical risk model
 - proposed protection action
 
@@ -521,7 +479,6 @@ Supabase hosts:
 
 - WGG database
 - wallet authentication functions
-- Pyth adapter
 - historical weekend-gap function
 - documentation state
 
@@ -548,7 +505,6 @@ GitHub Actions passed the TypeScript + WASM production build for the hardened co
 - official xStock matching
 - xStock mint decimals
 - liquidation-buffer signal
-- Pyth live-price adapter
 - historical weekend-gap adapter
 - P75 downside-gap risk signal
 - first-pass SAFE/WATCH/FLAGGED risk engine
@@ -577,14 +533,10 @@ As of 2026-09-19, the live WGG code path has been cleaned up and the protection 
 
 The `main` branch no longer includes the unreferenced `WeekendGapGuardWorkspaceV2.tsx`, `kaminoProtection.ts`, `wggKamino.ts`, or `WalletAuthGate.tsx` files. TypeScript now targets the live WGG source graph so legacy StockPass UI code cannot block the WGG build.
 
-The WGG build is now **verified** at the compiler/bundle level. GitHub Actions passed both `tsc --noEmit --pretty false` and the WASM production build, and Vercel reports the corrected deployment as READY. The live deployment root also returns HTTP 200.\n\nThe remaining verification gate is runtime behavior: configure the required production Pyth secret, exercise one real wallet-authenticated protection-prepare flow against a real eligible position, and confirm wallet signing/submission only after review.
-
 ### In progress
 
 - Verify newest Vercel deployment reaches READY
 - Verify wallet-authenticated protection preparation end-to-end
-- Configure Pyth API key
-- Verify live Pyth pricing
 - Verify historical weekend-gap responses
 - Verify exact repay calculation using fresh debt-reserve oracle pricing/decimals
 - Add server-side earnings calendar adapter
@@ -596,15 +548,6 @@ The WGG build is now **verified** at the compiler/bundle level. GitHub Actions p
 - Complete end-to-end test
 
 ## Remaining build modules
-
-### 1. Pyth production data
-
-Required:
-
-- server-side PYTH_API_KEY
-- feed validation
-- current price verification
-- historical sample verification
 
 ### 2. Earnings adapter
 
@@ -634,7 +577,6 @@ Required:
 - scheduled execution
 - discover monitored positions
 - refresh Kamino state
-- refresh Pyth price/gap inputs
 - evaluate risk
 - upsert wgg_monitored_positions
 - write wgg_alerts
@@ -758,7 +700,6 @@ Every new feature must preserve:
 
 **Unavailable upstream data must be shown as unavailable rather than guessed.**
 
-
 ## Native Kamino action milestone — 2026-09-19
 
 The WGG workspace now includes a non-custodial Kamino control surface for Borrow, Lend/Supply, collateral deposit, Repay, collateral withdrawal, and self-service Close Position. The server uses the current klend action builders and fresh Kamino state before every fund-moving preparation.
@@ -781,7 +722,6 @@ Weekend Gap Guard now includes the trusted monitoring and alert pipeline describ
 - `telegram-webhook` uses one-time wallet-authenticated link challenges stored in `wgg_telegram_link_challenges`.
 - The UI exposes the Telegram handoff only when `VITE_TELEGRAM_BOT_USERNAME` is configured.
 - Flagged Add Collateral/Repay actions now use `wgg_platform_actions` and the exact prepared-instruction verification path.
-- Pyth is not part of the active required path. xStocks supplies current market data and Twelve Data supplies historical weekend-gap statistics.
 
 ### Current required environment
 
@@ -851,7 +791,6 @@ The affected `WggDashboard` prop is now passed as `address ?? null`. The large n
 
 A fresh local TypeScript build could not be executed in the current tooling environment because outbound GitHub DNS resolution is unavailable. The source-side TypeScript error has been corrected, but the next Vercel build remains the authoritative compile verification.
 
-
 ## Runtime verification — 2026-09-19
 
 The connected production symptoms were traced to three separate runtime details:
@@ -911,8 +850,6 @@ The container environment cannot resolve GitHub DNS, so a local production build
 
 Vercel has accepted the Tailwind dependency/configuration commit, but the subsequent UI commits are currently being throttled by the Vercel deployment rate limit. The latest GitHub commit currently has a Vercel failure status pointing at the project's build-rate-limit page. A READY deployment containing the full UI rebuild has therefore not yet been independently confirmed.
 
-
-
 ## Light Wallet UX rebuild — 2026-09-19
 
 The authenticated StockPass/WGG workspace has been redesigned around the supplied Trust Wallet UI/UX references without copying their visual identity.
@@ -927,13 +864,11 @@ The authenticated StockPass/WGG workspace has been redesigned around the supplie
 
 The latest source commit before this documentation change is 9913e1f69cda690c2339f0fbef9620f3f1dfb05a. The currently reported Vercel status is still the deployment-rate-limit failure from the rapid deployment sequence; this does not independently verify the latest source as READY.
 
-
 ### Deployment compile fix — 2026-09-19
 
 Vercel build `dpl_9FdQB8hPSRZVqtproxSbqXCsQ4mk` stopped at TypeScript compilation in `src/WggMonitoringPage.tsx`. The npm `ERESOLVE` output was peer-dependency warnings; the fatal errors were caused by an untyped array containing Lucide icon components being rendered as `ReactNode`.
 
 Fixed by typing the monitoring pipeline metadata as `[LucideIcon, string, string][]` and importing the `LucideIcon` type. Fix commit: `86b2965cff371dee78c1f219e05aeb4667a8da0f`.
-
 
 ## Prototype-faithful wallet frontend milestone — 2026-09-19
 
@@ -972,7 +907,6 @@ No fake balances, fake risk readings, fake alerts, simulated timers, simulated c
 ### Verification state
 
 Source-level review was completed after the redesign. Local production build execution is still constrained by the current runtime's inability to resolve GitHub DNS / fetch a repository checkout. Vercel/GitHub CI status for the latest `main` commits remains the final build gate and must be checked before describing the deployment as READY.
-
 
 ## Runtime dependency + first-position Actions milestone — 2026-09-19
 
