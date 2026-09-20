@@ -88,7 +88,6 @@ It does not replace Kamino, custody funds, hold private keys, or give the applic
 
 ### Secrets/configuration still required
 
-- Server-side PYTH_API_KEY
 - Production `SOLANA_RPC_URL` for the protected Vercel function when a dedicated RPC is available
 - Production `VITE_SOLANA_RPC_URL` for browser mainnet reads when a dedicated RPC is used
 - Telegram bot configuration when notification work is enabled
