@@ -140,7 +140,7 @@ export default async function handler(req: any, res: any) {
       const reserve = market.getExistingReserveByAddress(address(reserveAddress));
       if (!reserve) return json(res, { error: 'The selected debt reserve is no longer present in Kamino.' }, 400);
 
-      const debt = (obligation.borrows ?? []).find(
+      const debt = obligation.getBorrows().find(
         (borrow: any) => String(borrow.reserveAddress ?? '') === reserveAddress,
       );
       if (!debt) return json(res, { error: 'The selected reserve is not currently borrowed by this obligation.' }, 400);
