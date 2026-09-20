@@ -285,12 +285,13 @@ export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return json(res, { error: 'POST required' }, 405);
 
   const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body ?? {});
-  const symbols = Array.from(
+  const requestedSymbols: unknown[] = Array.isArray(body.symbols) ? body.symbols : [];
+  const symbols: string[] = Array.from(
     new Set(
-      (Array.isArray(body.symbols) ? body.symbols : [])
+      requestedSymbols
         .map(normalizeSymbol)
-        .map((value: string) => value.endsWith('X') ? value : `${value}X`)
-        .filter((value: string) => /^[A-Z0-9]{2,12}X$/.test(value)),
+        .map((value) => value.endsWith('X') ? value : value + 'X')
+        .filter((value) => /^[A-Z0-9]{2,12}X$/.test(value)),
     ),
   ).slice(0, MAX_SYMBOLS);
 
