@@ -157,7 +157,7 @@ async function fetchHistorical(symbols: string[], weeks = 13): Promise<Record<st
       }))
       .filter((row: any) => /^\d{4}-\d{2}-\d{2}$/.test(row.date) && row.open !== null && row.close !== null)
       .map((row: any) => ({ date: row.date, open: row.open as number, close: row.close as number }))
-      .sort((a, b) => a.date.localeCompare(b.date));
+      .sort((a: DailyValue, b: DailyValue) => a.date.localeCompare(b.date));
 
     if (!values.length) continue;
     const map = new Map(values.map((value) => [value.date, value]));
@@ -517,11 +517,11 @@ async function loadMonitoringState(wallet: string) {
   if (telegramResult.error) throw telegramResult.error;
 
   const latestPositionCheck = (positionsResult.data ?? [])
-    .map((row) => row.last_checked_at)
+    .map((row: { last_checked_at: string | null }) => row.last_checked_at)
     .filter(Boolean)
     .sort()
     .at(-1) ?? null;
-  const latestCompletedRun = (runsResult.data ?? []).find((run) => run.status === 'completed');
+  const latestCompletedRun = (runsResult.data ?? []).find((run: { status: string }) => run.status === 'completed');
 
   return {
     wallet,
@@ -529,7 +529,7 @@ async function loadMonitoringState(wallet: string) {
     lastRun: runsResult.data?.[0] ?? null,
     runs: runsResult.data ?? [],
     positions: positionsResult.data ?? [],
-    alerts: (alertsResult.data ?? []).map((alert) => ({
+    alerts: (alertsResult.data ?? []).map((alert: { id: string; severity: string; title: string; message: string; details: unknown; created_at: string; acknowledged_at: string | null; telegram_sent_at: string | null }) => ({
       id: alert.id,
       severity: alert.severity,
       title: alert.title,
