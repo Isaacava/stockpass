@@ -1,12 +1,12 @@
-import { discoverKaminoXStockPositions } from '../src/lib/kamino';
+import { discoverKaminoXStockPositions } from '../src/lib/kamino.js';
 
 const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
-import { evaluateEarningsRisk, type EarningsEvent } from '../src/lib/wggEarnings';
+import { evaluateEarningsRisk, type EarningsEvent } from '../src/lib/wggEarnings.js';
 import {
   calculateCollateralUsdForTargetLtv,
   calculateRepayUsdForTargetLtv,
   evaluateWeekendRisk,
-} from '../src/lib/wggRisk';
+} from '../src/lib/wggRisk.js';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
