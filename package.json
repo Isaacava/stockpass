@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && tsc -p tsconfig.api.json && vite build",
+    "typecheck:api": "tsc -p tsconfig.api.json",
     "preview": "vite preview"
   },
   "dependencies": {
