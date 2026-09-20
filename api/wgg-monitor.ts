@@ -277,9 +277,10 @@ async function upsertPositionRisk(wallet: string, position: any, stock: any, pri
     .maybeSingle();
 
   const earningsRisk = evaluateEarningsRisk(underlying(stock.symbol), earningsEvent);
-  const risk = gap?.typicalWeekendGapPct != null && position.liquidationBufferPct != null
+  const risk = gap?.typicalWeekendGapPct != null && position.ltvPct != null && position.liquidationLtvPct != null
     ? evaluateWeekendRisk({
-        currentBufferPct: position.liquidationBufferPct,
+        currentLtvPct: position.ltvPct,
+        liquidationLtvPct: position.liquidationLtvPct,
         typicalWeekendGapPct: gap.typicalWeekendGapPct,
         earningsRisk: earningsRisk.upcoming,
       })
@@ -293,7 +294,8 @@ async function upsertPositionRisk(wallet: string, position: any, stock: any, pri
   if (risk && position.liquidationLtvPct != null && position.borrowValueUsd != null && position.depositValueUsd != null) {
     riskStatus = risk.status;
     if (risk.status === 'flagged') {
-      targetLtvPct = Math.max(1, position.liquidationLtvPct - risk.adjustedGapPct * 1.2);
+      const remainingCollateralFactor = Math.max(0.01, 1 - risk.adjustedGapPct / 100);
+      targetLtvPct = Math.max(1, position.liquidationLtvPct * remainingCollateralFactor * 0.98);
       recommendedRepayUsd = calculateRepayUsdForTargetLtv(position.borrowValueUsd, position.depositValueUsd, targetLtvPct);
       recommendedCollateralUsd = calculateCollateralUsdForTargetLtv(position.borrowValueUsd, position.depositValueUsd, targetLtvPct);
     }
