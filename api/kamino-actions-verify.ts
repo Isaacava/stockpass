@@ -18,9 +18,10 @@ function json(res: any, body: unknown, status = 200) {
 
 async function loadConfirmedTransaction(connection: any, signature: string) {
   for (let attempt = 0; attempt < 4; attempt += 1) {
-    const tx = await connection.getParsedTransaction(signature, {
+    const tx = await connection.getTransaction(signature, {
       commitment: 'confirmed',
       maxSupportedTransactionVersion: 0,
+      encoding: 'json',
     });
     if (tx) return tx;
     await new Promise((resolve) => setTimeout(resolve, 900 * (attempt + 1)));
@@ -93,32 +94,31 @@ export default async function handler(req: any, res: any) {
       return json(res, { error: 'Transaction is not confirmed successfully on mainnet.' }, 409);
     }
 
-    const signerPresent = tx.transaction.message.accountKeys.some(
-      (key: { pubkey: { toBase58(): string }; signer: boolean }) => key.pubkey.toBase58() === wallet && key.signer,
-    );
-    const actualKaminoInstructions = tx.transaction.message.instructions
-      .filter((instruction: any) => String(instruction.programId || '') === KAMINO_PROGRAM_ID)
-      .map(actualInstructionFingerprint);
+    const message = tx.transaction.message as any;
+    const accountKeys: string[] = (message.accountKeys ?? []).map((key: unknown) => String(key));
+    const requiredSignerCount = Number(message.header?.numRequiredSignatures ?? 0);
+    const signerPresent = accountKeys.slice(0, requiredSignerCount).includes(wallet);
+
+    const actualInstructions = (message.instructions ?? []).map((instruction: any) => actualInstructionFingerprint({
+      programId: accountKeys[Number(instruction.programIdIndex)],
+      accounts: (instruction.accounts ?? []).map((index: number) => accountKeys[index]),
+      data: String(instruction.data ?? ''),
+    }));
+    const actualKaminoPresent = actualInstructions.some((instruction) => instruction.programId === KAMINO_PROGRAM_ID);
 
     const preparedMetadata = row.metadata && typeof row.metadata === 'object'
       ? row.metadata as { preparedInstructions?: unknown }
       : null;
     const preparedInstructions = Array.isArray(preparedMetadata?.preparedInstructions)
-      ? preparedMetadata.preparedInstructions
-          .filter((instruction: any) => String(instruction.programAddress || '') === KAMINO_PROGRAM_ID)
-          .map(expectedInstructionFingerprint)
+      ? preparedMetadata.preparedInstructions.map(expectedInstructionFingerprint)
       : [];
 
-    if (!signerPresent || !actualKaminoInstructions.length) {
+    if (!signerPresent || !actualKaminoPresent) {
       return json(res, { error: 'Confirmed transaction does not contain the authenticated wallet signer and expected Kamino program activity.' }, 422);
     }
 
-    if (!preparedInstructions.length || preparedInstructions.length !== actualKaminoInstructions.length) {
-      return json(res, { error: 'Confirmed transaction does not match the prepared Kamino instruction set.' }, 422);
-    }
-
-    if (!verifyPreparedKaminoInstructionSet(actualKaminoInstructions, preparedInstructions)) {
-      return json(res, { error: 'Confirmed transaction differs from the instructions StockPass prepared.' }, 422);
+    if (!verifyPreparedKaminoInstructionSet(actualInstructions, preparedInstructions)) {
+      return json(res, { error: 'Confirmed transaction differs from the complete set of instructions StockPass prepared.' }, 422);
     }
 
     const updateResult = await supabase
