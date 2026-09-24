@@ -34,12 +34,14 @@ jobs:
         run: npx vite build --config vite.config.wasm.ts
 
       - name: Promote verified build to Vercel
-        if: ${{ github.ref == 'refs/heads/main' && env.VERCEL_TOKEN != '' }}
+        if: ${{ github.ref == 'refs/heads/main' && env.VERCEL_TOKEN != '' && env.VERCEL_PROJECT_ID != '' && env.VERCEL_ORG_ID != '' }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
         run: |
           mkdir -p .vercel
-          cat > .vercel/project.json <<'JSON'
-          {"projectId":"prj_T9kw5Utr35iklpAuVoKyi0EAqWcM","orgId":"team_xiDx3kTa653lWo4vl2dZw8Ag"}
+          cat > .vercel/project.json <<JSON
+          {"projectId":"$VERCEL_PROJECT_ID","orgId":"$VERCEL_ORG_ID"}
           JSON
           npx vercel@latest deploy --prod --yes --token "$VERCEL_TOKEN"
