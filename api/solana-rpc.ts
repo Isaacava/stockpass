@@ -18,6 +18,11 @@ const ALLOWED_RPC_METHODS = new Set([
   'sendTransaction',
 ]);
 
+const READ_RATE_LIMIT = 180;
+const SEND_RATE_LIMIT = 8;
+const WINDOW_MS = 60_000;
+const rateBuckets = new Map<string, { startedAt: number; count: number }>();
+
 function json(res: any, body: unknown, status = 200) {
   res.status(status)
     .setHeader('Cache-Control', 'no-store')
@@ -43,11 +48,27 @@ function sameOrigin(req: any): boolean {
       const parsed = new URL(candidate);
       if (parsed.hostname.toLowerCase() === host) return true;
     } catch {
-      // Ignore malformed browser-origin headers and fail closed below.
+      // Fail closed on malformed browser-origin headers.
     }
   }
 
   return false;
+}
+
+function clientAddress(req: any): string {
+  const forwarded = String(req.headers?.['x-forwarded-for'] ?? '').split(',')[0].trim();
+  return forwarded || String(req.socket?.remoteAddress ?? 'unknown');
+}
+
+function rateLimited(key: string, limit: number) {
+  const now = Date.now();
+  const bucket = rateBuckets.get(key);
+  if (!bucket || now - bucket.startedAt >= WINDOW_MS) {
+    rateBuckets.set(key, { startedAt: now, count: 1 });
+    return false;
+  }
+  bucket.count += 1;
+  return bucket.count > limit;
 }
 
 function parseRpcBody(raw: unknown): { method: string; params?: unknown; id?: unknown; jsonrpc?: unknown } | null {
@@ -70,6 +91,53 @@ function parseRpcBody(raw: unknown): { method: string; params?: unknown; id?: un
   };
 }
 
+function firstParam(params: unknown): unknown {
+  return Array.isArray(params) ? params[0] : undefined;
+}
+
+async function validateWalletSession(req: any, wallet: string) {
+  const clientInfoHeader = req.headers?.['x-client-info'];
+  const clientInfo = Array.isArray(clientInfoHeader) ? clientInfoHeader.join(' ') : String(clientInfoHeader ?? '');
+  if (!wallet || !/stockpass-session=[^\s]+/.test(clientInfo)) return false;
+
+  const supabaseUrl = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+  if (!serviceRoleKey) return false;
+
+  const response = await fetch(supabaseUrl + '/functions/v1/wallet-auth', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      apikey: serviceRoleKey,
+      'x-client-info': clientInfo,
+    },
+    body: JSON.stringify({ action: 'validate', wallet }),
+  });
+  return response.ok;
+}
+
+function extractTransactionEncoding(params: unknown): string | null {
+  const first = firstParam(params);
+  if (typeof first !== 'string' || !first) return null;
+  return first;
+}
+
+async function transactionMatchesWallet(encoded: string, wallet: string) {
+  try {
+    const { VersionedTransaction, Transaction } = await import('@solana/web3.js');
+    const bytes = Buffer.from(encoded, 'base64');
+    try {
+      const versioned = VersionedTransaction.deserialize(bytes);
+      return versioned.message.staticAccountKeys[0]?.toBase58() === wallet;
+    } catch {
+      const legacy = Transaction.from(bytes);
+      return legacy.feePayer?.toBase58() === wallet;
+    }
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return json(res, { error: 'POST required' }, 405);
 
@@ -88,6 +156,27 @@ export default async function handler(req: any, res: any) {
   const rpc = parseRpcBody(body);
   if (!rpc || !ALLOWED_RPC_METHODS.has(rpc.method)) {
     return json(res, { error: 'RPC method is not allowed.' }, 403);
+  }
+
+  const bucketKey = clientAddress(req) + ':' + rpc.method;
+  if (rateLimited(bucketKey, rpc.method === 'sendTransaction' ? SEND_RATE_LIMIT : READ_RATE_LIMIT)) {
+    return json(res, { error: 'RPC rate limit exceeded. Please retry shortly.' }, 429);
+  }
+
+  if (rpc.method === 'sendTransaction') {
+    const wallet = String(req.headers?.['x-stockpass-wallet'] ?? '').trim();
+    const encoded = extractTransactionEncoding(rpc.params);
+    if (!wallet || !encoded) {
+      return json(res, { error: 'Wallet-bound transaction submission is required.' }, 401);
+    }
+
+    if (!await validateWalletSession(req, wallet)) {
+      return json(res, { error: 'A valid wallet session is required to submit transactions.' }, 401);
+    }
+
+    if (!await transactionMatchesWallet(encoded, wallet)) {
+      return json(res, { error: 'Transaction fee payer does not match the authenticated wallet.' }, 422);
+    }
   }
 
   try {
