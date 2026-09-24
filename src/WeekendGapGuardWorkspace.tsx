@@ -19,7 +19,7 @@ import WggActionsPage from './WggActionsPage';
 import WggMonitoringPage from './WggMonitoringPage';
 import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk, selectWeekendGapPct, type WeekendRiskProfile } from './lib/wggRisk';
 import { fetchWggMarketData, type XStockPriceMap, type WeekendGapMap } from './lib/wggMarketData';
-import { clearWalletSession, refreshWalletSession } from './lib/walletAuth';
+import { clearWalletSession, refreshWalletSession, walletAuthHeaders } from './lib/walletAuth';
 import { readWalletSessionToken } from './lib/walletSession';
 import { SOLANA_MAINNET_RPC } from './config';
 import './app.css';
@@ -267,7 +267,13 @@ export default function WeekendGapGuardWorkspace() {
     setSignature('');
     try {
       if (!endpoint) throw new Error('The Solana mainnet RPC proxy is not configured.');
-      const connection = new Connection(endpoint, 'confirmed');
+      const connection = new Connection(endpoint, {
+        commitment: 'confirmed',
+        httpHeaders: {
+          ...walletAuthHeaders(),
+          'x-stockpass-wallet': address,
+        },
+      });
       const latest = await connection.getLatestBlockhash('confirmed');
       const instructions = prepared.instructions.map((ix) => new TransactionInstruction({
         programId: new PublicKey(ix.programAddress),
