@@ -1,3 +1,4 @@
+import { buildWeekendGapSummary, type DailyOHLC, type WeekendGapSummary } from '../src/lib/wggGap.js';
 import { discoverKaminoXStockPositions } from '../src/lib/kamino.js';
 
 const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
@@ -22,26 +23,7 @@ type XStockPrice = {
   updatedAt: number | null;
 };
 
-type DailyValue = { date: string; open: number; close: number };
-type WeekendGap = {
-  underlyingSymbol: string;
-  sampleCount: number;
-  typicalWeekendGapPct: number | null;
-  p75GapPct: number | null;
-  p90GapPct: number | null;
-  p90DownsideGapPct: number | null;
-  maxDownsideGapPct: number | null;
-  observations: Array<{
-    sessionDate: string;
-    nextSessionDate: string;
-    calendarGapDays: number;
-    fridayDate: string | null;
-    fridayClose: number;
-    nextOpen: number;
-    gapPct: number;
-    downsideGapPct: number;
-  }>;
-};
+type DailyValue = DailyOHLC;
 
 let supabase: any = null;
 
@@ -69,21 +51,6 @@ function addDays(date: Date, days: number) {
   const out = new Date(date.getTime());
   out.setUTCDate(out.getUTCDate() + days);
   return out;
-}
-
-function calendarDaysBetween(from: string, to: string) {
-  return Math.round((Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / 86_400_000);
-}
-
-function percentile(values: number[], p: number): number | null {
-  if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  if (sorted.length === 1) return sorted[0];
-  const index = (sorted.length - 1) * p;
-  const lower = Math.floor(index);
-  const upper = Math.ceil(index);
-  if (lower === upper) return sorted[lower];
-  return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
 }
 
 function underlying(symbol: string) {
@@ -117,7 +84,7 @@ async function fetchXStockData(symbols: string[]): Promise<Record<string, XStock
   return Object.fromEntries(entries.filter((entry): entry is readonly [string, XStockPrice] => Boolean(entry)));
 }
 
-async function fetchHistorical(symbols: string[], weeks = 13): Promise<Record<string, WeekendGap>> {
+async function fetchHistorical(symbols: string[], weeks = 13): Promise<Record<string, WeekendGapSummary>> {
   if (!TWELVE_DATA_API_KEY || !symbols.length) return {};
   const normalizedSymbols = [...new Set(symbols)].sort();
   const start = dateKey(addDays(new Date(), -(weeks + 12) * 7));
@@ -127,7 +94,7 @@ async function fetchHistorical(symbols: string[], weeks = 13): Promise<Record<st
   if (!supabase) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');
   const { data: cachedRow } = await supabase
     .from('wgg_market_cache')
-    .select('payload,expires_at')
+    .select('payload')
     .eq('cache_key', cacheKey)
     .gt('expires_at', new Date().toISOString())
     .maybeSingle();
@@ -147,12 +114,11 @@ async function fetchHistorical(symbols: string[], weeks = 13): Promise<Record<st
     });
     const text = await response.text();
     if (!response.ok) throw new Error(`Twelve Data ${response.status}: ${text.slice(0, 240)}`);
+
     const raw = JSON.parse(text) as Record<string, any>;
     parsed = {};
-
     if ('values' in raw || 'status' in raw) {
-      const metaSymbol = String(raw.meta?.symbol || normalizedSymbols[0]).toUpperCase();
-      parsed[metaSymbol] = raw;
+      parsed[String(raw.meta?.symbol || normalizedSymbols[0]).toUpperCase()] = raw;
     } else {
       for (const [key, value] of Object.entries(raw)) {
         if (value && typeof value === 'object') parsed[key.toUpperCase()] = value;
@@ -168,53 +134,18 @@ async function fetchHistorical(symbols: string[], weeks = 13): Promise<Record<st
     });
   }
 
-  const out: Record<string, WeekendGap> = {};
+  const out: Record<string, WeekendGapSummary> = {};
   for (const symbol of normalizedSymbols) {
-    const series = parsed[symbol];
-    const values: DailyValue[] = (series?.values ?? [])
+    const values: DailyOHLC[] = (parsed[symbol]?.values ?? [])
       .map((row: any) => ({
         date: String(row?.datetime ?? '').slice(0, 10),
         open: finiteNumber(row?.open),
         close: finiteNumber(row?.close),
       }))
-      .filter((row: any) => /^\\d{4}-\\d{2}-\\d{2}$/.test(row.date) && row.open !== null && row.close !== null)
-      .map((row: any) => ({ date: row.date, open: row.open as number, close: row.close as number }))
-      .sort((a: DailyValue, b: DailyValue) => a.date.localeCompare(b.date));
+      .filter((row: DailyOHLC) => /^\\d{4}-\\d{2}-\\d{2}$/.test(row.date) && row.open > 0 && row.close > 0);
 
-    const observations: WeekendGap['observations'] = [];
-    for (let index = 0; index < values.length - 1 && observations.length < weeks; index += 1) {
-      const current = values[index];
-      const next = values[index + 1];
-      if (Date.parse(current.date + 'T00:00:00Z') < Date.parse(start + 'T00:00:00Z')) continue;
-      const calendarGapDays = calendarDaysBetween(current.date, next.date);
-      if (calendarGapDays < 3 || current.close <= 0 || next.open <= 0) continue;
-      const gapPct = ((next.open - current.close) / current.close) * 100;
-      observations.push({
-        sessionDate: current.date,
-        nextSessionDate: next.date,
-        calendarGapDays,
-        fridayDate: new Date(current.date + 'T00:00:00Z').getUTCDay() === 5 ? current.date : null,
-        fridayClose: current.close,
-        nextOpen: next.open,
-        gapPct,
-        downsideGapPct: Math.max(0, -gapPct),
-      });
-    }
-
-    if (observations.length < Math.max(8, Math.floor(weeks * 0.6))) continue;
-    const gaps = observations.map((item) => item.gapPct);
-    const downside = observations.map((item) => item.downsideGapPct);
-
-    out[symbol] = {
-      underlyingSymbol: symbol,
-      sampleCount: observations.length,
-      typicalWeekendGapPct: percentile(downside, 0.75),
-      p75GapPct: percentile(gaps, 0.75),
-      p90GapPct: percentile(gaps, 0.9),
-      p90DownsideGapPct: percentile(downside, 0.9),
-      maxDownsideGapPct: Math.max(...downside),
-      observations,
-    };
+    const summary = buildWeekendGapSummary(symbol, values, weeks);
+    if (summary) out[symbol] = summary;
   }
   return out;
 }
