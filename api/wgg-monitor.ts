@@ -142,7 +142,7 @@ async function fetchHistorical(symbols: string[], weeks = 13): Promise<Record<st
         open: finiteNumber(row?.open),
         close: finiteNumber(row?.close),
       }))
-      .filter((row: DailyOHLC) => /^\\d{4}-\\d{2}-\\d{2}$/.test(row.date) && row.open > 0 && row.close > 0);
+      .filter((row: DailyOHLC) => /^\d{4}-\d{2}-\d{2}$/.test(row.date) && row.open > 0 && row.close > 0);
 
     const summary = buildWeekendGapSummary(symbol, values, weeks);
     if (summary) out[symbol] = summary;
