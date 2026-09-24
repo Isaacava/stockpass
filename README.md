@@ -1,54 +1,104 @@
-# StockPass
+# StockPass — Weekend Gap Guard
 
-StockPass is a Stocklana social-trading product built around one idea: **social proof should be verifiable onchain**.
+StockPass is now the home of **Weekend Gap Guard (WGG)**, a non-custodial Solana protection and monitoring layer for xStock-backed Kamino positions.
 
-## Product loop
+## What WGG does
 
-1. Connect a Solana wallet.
-2. Read configured xStock token accounts on Solana mainnet.
-3. Turn real wallet state into verified holder/seller proof.
-4. Publish a post attached to the asset and verification snapshot.
-5. Follow people, create price/social alerts, and discover crowd signals.
-6. Buy, sell, and manage supported tokenized-stock positions through real Solana mainnet transactions.
-7. Share a public profile or position card without exposing the whole portfolio.
+1. Connect a Solana wallet with a signature-only authentication challenge.
+2. Read the wallet's real Kamino obligations on Solana mainnet.
+3. Identify xStock collateral such as AAPLx, NVDAx and TSLAx.
+4. Read live collateral, debt, LTV and liquidation state from Kamino.
+5. Read current xStock price and multiplier data from xStocks.
+6. Build a historical closure-gap model from the underlying stock's daily OHLC data.
+7. Stress the live LTV using a selectable historical scenario: P75, P90 or maximum observed downside.
+8. Show a Safe, Watch or Flagged state.
+9. When protection is required, prepare a real Kamino repay or add-collateral transaction for the connected wallet to review and sign.
+10. Independently verify the confirmed transaction against the complete instruction set prepared by StockPass before marking the action confirmed.
+11. Persist monitored positions and alerts for opt-in monitoring and Telegram delivery.
 
-## Hackathon fit
+## Source-of-truth boundaries
 
-Stocklana explicitly calls out consumer/mobile social trading and asks teams to make one wedge excellent. StockPass focuses on the consumer wedge and differentiates on verifiable ownership proof rather than screenshot-based claims.
+| Data | Source |
+| --- | --- |
+| Wallet ownership and token balances | Solana mainnet |
+| Kamino collateral, debt, LTV and liquidation | Kamino |
+| Current xStock price and multiplier | xStocks |
+| Historical stock closure-gap context | Twelve Data |
+| Monitoring state and action ledger | Supabase |
 
-The Stocklana page currently lists a $100K prize pool and a September 18, 2026 submission deadline. The judging criteria emphasize a real user/problem, a working end-to-end demo, why the product belongs on Solana, and execution quality.
+Historical data is treated as context only. It never substitutes for on-chain ownership, debt or collateral state.
+
+## Risk scenarios
+
+WGG exposes three historical downside scenarios:
+
+- **Typical / P75** — 75th percentile downside gap.
+- **Conservative / P90** — 90th percentile downside gap.
+- **Extreme / Max** — maximum observed downside gap in the configured historical window.
+
+All three use the same LTV stress equation. No separate risk mathematics is introduced for the profiles.
+
+## Non-custodial boundaries
+
+WGG does not:
+
+- hold funds or private keys;
+- retain standing transaction permission;
+- liquidate or move funds automatically;
+- fabricate balances or risk readings when upstream data is unavailable.
+
+Every fund-moving action is signed by the user's wallet.
+
+## Weekend and holiday handling
+
+The historical model no longer assumes Friday is always the final trading session. It uses the last observed US equity session followed by a calendar closure of at least three days, so normal Friday→Monday weekends and holiday closures such as Thursday→Monday are represented by the same calculation.
+
+Scheduled monitoring runs before the market-close window on both Thursday and Friday, while the market-data model itself determines the actual trading-session gap.
+
+## Monitoring and cache
+
+Historical Twelve Data responses are cached server-side in Supabase so Vercel cold starts do not discard the full historical cache. The cache is server-only and has a time-to-live.
+
+The Solana RPC proxy keeps read methods available to the application but binds `sendTransaction` to:
+
+- a valid StockPass wallet session;
+- the wallet declared by the request;
+- the transaction's fee payer;
+- a rate limit.
+
+## Testing
+
+The repository includes deterministic tests for:
+
+- P75/P90/max risk scenario selection;
+- Safe/Watch/Flagged risk outcomes;
+- holiday-aware closure-gap calculation;
+- exact Kamino instruction verification;
+- tampered instruction data;
+- extra and reordered instructions.
+
+Production builds run the test suite before TypeScript and Vite compilation.
 
 ## Architecture
 
-- React + Vite + TypeScript
-- Solana Wallet Adapter + `@solana/web3.js`
-- Solana **mainnet** as the source of truth for ownership, balances, asset state, and transaction execution
-- Supabase for profiles, posts, follows, alerts, and verification snapshots
-- Vercel-ready static frontend
-- Mainnet-only product: there is no devnet trading or simulated transaction rail
+- React 19
+- Vite
+- TypeScript
+- Reown wallet connection
+- Solana mainnet
+- Kamino KLend SDK
+- Supabase database and Edge Functions
+- Vercel serverless API routes
 
-## Important verification rule
+The active public route is `/`. Authenticated WGG routes are under `/app`.
 
-Do not grant a verified badge from ticker text alone. A badge should require:
-
-- a connected wallet
-- a configured official asset mint
-- a non-zero token balance at verification time
-- a stored verification timestamp/slot
-- optionally a proof transaction/signature when an execution event exists
-
-The repo intentionally leaves xStock mint variables empty rather than guessing contract addresses.
-
-## Mainnet transaction rule
-
-All supported buys, sells, swaps, and position changes must use real Solana mainnet transactions. The app must show the wallet's actual resulting balance and transaction signature after confirmation. No simulated balance may be used to represent an executed trade.
-
-## Local setup
+## Local development
 
 ```bash
 npm install
-cp .env.example .env.local
+npm test
+npm run build
 npm run dev
 ```
 
-Add the official asset mint addresses and Supabase public project values to `.env.local` before testing live verification and mainnet flows.
+Required server configuration includes the authenticated Solana RPC URL, Supabase service-role key, Twelve Data API key and cron secret. Browser code never receives the server-side RPC credential.
