@@ -2,35 +2,57 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildWeekendGapSummary } from '../src/lib/wggGap.ts';
 
-function addDays(date: Date, days: number) {
-  const value = new Date(date);
-  value.setUTCDate(value.getUTCDate() + days);
-  return value;
-}
+function businessDates(start: string, end: string, skip: Set<string> = new Set()) {
+  const rows: Array<{ date: string; open: number; close: number }> = [];
+  const cursor = new Date(start + 'T00:00:00Z');
+  const limit = new Date(end + 'T00:00:00Z');
+  let index = 0;
 
-function iso(date: Date) {
-  return date.toISOString().slice(0, 10);
+  while (cursor <= limit) {
+    const day = cursor.getUTCDay();
+    const date = cursor.toISOString().slice(0, 10);
+    if (day !== 0 && day !== 6 && !skip.has(date)) {
+      const base = 100 + index;
+      rows.push({ date, open: base, close: base });
+      index += 1;
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+
+  return rows;
 }
 
 test('gap model uses actual session closures, including holiday-style Thursday to Monday gaps', () => {
-  const rows: Array<{ date: string; open: number; close: number }> = [];
-  let cursor = new Date('2026-01-02T00:00:00Z');
+  const holidaySkip = new Set(['2026-02-13']);
+  const rows = businessDates('2026-01-05', '2026-03-02', holidaySkip);
 
-  for (let week = 0; week < 9; week += 1) {
-    const friday = addDays(cursor, week * 7);
-    const monday = addDays(friday, 3);
-    rows.push({ date: iso(friday), open: 100 + week, close: 100 + week });
-    rows.push({ date: iso(monday), open: 95 - week * 0.5, close: 99 });
-  }
+  const friday = rows.find((row) => row.date === '2026-02-06');
+  const holidayThursday = rows.find((row) => row.date === '2026-02-12');
+  const monday = rows.find((row) => row.date === '2026-02-16');
 
-  rows.push({ date: '2026-02-12', open: 105, close: 105 });
-  rows.push({ date: '2026-02-16', open: 95, close: 99 });
+  assert.ok(friday);
+  assert.ok(holidayThursday);
+  assert.ok(monday);
 
-  const summary = buildWeekendGapSummary('AAPL', rows, 10, new Date('2026-03-01T00:00:00Z'));
+  friday!.close = 110;
+  monday!.open = 95;
+  holidayThursday!.close = 120;
+
+  const summary = buildWeekendGapSummary(
+    'AAPL',
+    rows,
+    10,
+    new Date('2026-03-01T00:00:00Z'),
+  );
 
   assert.ok(summary);
   assert.ok(summary.sampleCount >= 8);
-  assert.equal(summary.observations.some((item) => item.fridayDate === null && item.calendarGapDays === 4), true);
+  assert.equal(
+    summary.observations.some(
+      (item) => item.sessionDate === '2026-02-12' && item.nextSessionDate === '2026-02-16' && item.calendarGapDays === 4,
+    ),
+    true,
+  );
   assert.equal(summary.p90DownsideGapPct !== null, true);
   assert.equal(summary.maxDownsideGapPct !== null, true);
 });
