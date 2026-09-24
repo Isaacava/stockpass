@@ -110,7 +110,7 @@ export default async function handler(req: any, res: any) {
       ? row.metadata as { preparedInstructions?: unknown }
       : null;
     const preparedInstructions = Array.isArray(preparedMetadata?.preparedInstructions)
-      ? preparedMetadata.preparedInstructions.map((instruction: unknown) => expectedInstructionFingerprint(instruction))
+      ? preparedMetadata.preparedInstructions.map((instruction: unknown) => expectedInstructionFingerprint(instruction as { programAddress: string; accounts: Array<{ address: string }>; data: string }))
       : [];
 
     if (!signerPresent || !actualKaminoPresent) {
