@@ -49,6 +49,7 @@ type WeekendGapSummary = {
   medianGapPct: number | null;
   p75GapPct: number | null;
   p90GapPct: number | null;
+  p90DownsideGapPct: number | null;
   maxDownsideGapPct: number | null;
   typicalWeekendGapPct: number | null;
   windowStart: string | null;
@@ -60,6 +61,10 @@ type WeekendGapSummary = {
 type CacheEntry = { expiresAt: number; value: unknown };
 
 const cache = new Map<string, CacheEntry>();
+let supabase: any = null;
+
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const PRICE_CACHE_TTL = 15_000;
 const HISTORY_CACHE_TTL = 30 * 60_000;
 const MAX_SYMBOLS = 12;
@@ -151,12 +156,10 @@ function addDays(date: Date, days: number): Date {
   return result;
 }
 
-function lastCompletedFriday(today = new Date()): Date {
-  const day = today.getUTCDay();
-  const daysSinceFriday = day >= 5 ? day - 5 : day + 2;
-  const friday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-  friday.setUTCDate(friday.getUTCDate() - daysSinceFriday);
-  return friday;
+function calendarDaysBetween(from: string, to: string): number {
+  const fromMs = Date.parse(from + 'T00:00:00Z');
+  const toMs = Date.parse(to + 'T00:00:00Z');
+  return Math.round((toMs - fromMs) / 86_400_000);
 }
 
 function percentile(values: number[], p: number): number | null {
@@ -170,10 +173,53 @@ function percentile(values: number[], p: number): number | null {
   return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
 }
 
+async function getSupabaseClient() {
+  if (!SUPABASE_SERVICE_ROLE_KEY) return null;
+  if (!supabase) {
+    const { createClient } = await import('@supabase/supabase-js');
+    supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+  return supabase;
+}
+
+async function fetchPersistentCache<T>(cacheKey: string): Promise<T | null> {
+  const client = await getSupabaseClient();
+  if (!client) return null;
+  const { data, error } = await client
+    .from('wgg_market_cache')
+    .select('payload,expires_at')
+    .eq('cache_key', cacheKey)
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle();
+  if (error || !data) return null;
+  return data.payload as T;
+}
+
+async function writePersistentCache(cacheKey: string, provider: string, value: unknown, ttlMs: number) {
+  const client = await getSupabaseClient();
+  if (!client) return;
+  const expiresAt = new Date(Date.now() + ttlMs).toISOString();
+  await client.from('wgg_market_cache').upsert({
+    cache_key: cacheKey,
+    provider,
+    payload: value,
+    expires_at: expiresAt,
+    updated_at: new Date().toISOString(),
+  });
+}
+
 async function fetchTwelveDataSeries(symbols: string[], startDate: string, endDate: string, apiKey: string) {
-  const cacheKey = `td:${symbols.join(',')}:${startDate}:${endDate}`;
-  const cachedValue = cached<Record<string, TwelveDataSeries>>(cacheKey);
-  if (cachedValue) return cachedValue;
+  const normalizedSymbols = [...new Set(symbols)].sort();
+  const cacheKey = `td:${normalizedSymbols.join(',')}:${startDate}:${endDate}`;
+  const memoryCached = cached<Record<string, TwelveDataSeries>>(cacheKey);
+  if (memoryCached) return memoryCached;
+  const persistentCached = await fetchPersistentCache<Record<string, TwelveDataSeries>>(cacheKey);
+  if (persistentCached) {
+    putCache(cacheKey, persistentCached, HISTORY_CACHE_TTL);
+    return persistentCached;
+  }
 
   const url = new URL(`${TWELVE_DATA_BASE}/time_series`);
   url.searchParams.set('symbol', symbols.join(','));
@@ -209,6 +255,7 @@ async function fetchTwelveDataSeries(symbols: string[], startDate: string, endDa
   }
 
   putCache(cacheKey, normalized, HISTORY_CACHE_TTL);
+  await writePersistentCache(cacheKey, 'Twelve Data', normalized, 24 * 60 * 60_000);
   return normalized;
 }
 
@@ -222,36 +269,30 @@ function buildSummary(underlying: string, series: TwelveDataSeries, weeks: numbe
     .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value.date) && value.open !== null && value.close !== null)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  if (!values.length) return null;
+  if (values.length < 2) return null;
 
-  const map = new Map(values.map((value) => [value.date, value]));
-  const latestFriday = lastCompletedFriday();
-  const earliestFriday = addDays(latestFriday, -(weeks + 8) * 7);
+  const earliestDate = addDays(new Date(), -(weeks + 12) * 7);
   const observations: WeekendGapObservation[] = [];
 
-  for (let date = new Date(earliestFriday); date <= latestFriday && observations.length < weeks; date = addDays(date, 1)) {
-    if (date.getUTCDay() !== 5) continue;
+  for (let index = 0; index < values.length - 1 && observations.length < weeks; index += 1) {
+    const current = values[index];
+    const next = values[index + 1];
+    if (Date.parse(current.date + 'T00:00:00Z') < earliestDate.getTime()) continue;
 
-    const fridayDate = dateKey(date);
-    const friday = map.get(fridayDate);
-    if (!friday || friday.close === null || friday.close <= 0) continue;
+    const gapDays = calendarDaysBetween(current.date, next.date);
+    // A normal Friday->Monday weekend is 3 calendar days. A Thursday->Monday
+    // closure (or another market holiday) is longer and is handled the same way.
+    if (gapDays < 3) continue;
+    if (current.close === null || current.close <= 0 || next.open === null || next.open <= 0) continue;
 
-    let nextSessionDate: string | null = null;
-    let nextOpen: number | null = null;
-    for (const candidate of values) {
-      if (candidate.date <= fridayDate) continue;
-      nextSessionDate = candidate.date;
-      nextOpen = candidate.open;
-      break;
-    }
-    if (!nextSessionDate || nextOpen === null || nextOpen <= 0) continue;
-
-    const gapPct = ((nextOpen - friday.close) / friday.close) * 100;
+    const gapPct = ((next.open - current.close) / current.close) * 100;
     observations.push({
-      fridayDate,
-      nextSessionDate,
-      fridayClose: friday.close,
-      nextOpen,
+      sessionDate: current.date,
+      nextSessionDate: next.date,
+      calendarGapDays: gapDays,
+      fridayDate: new Date(current.date + 'T00:00:00Z').getUTCDay() === 5 ? current.date : null,
+      fridayClose: current.close,
+      nextOpen: next.open,
       gapPct,
       downsideGapPct: Math.max(0, -gapPct),
     });
@@ -269,12 +310,13 @@ function buildSummary(underlying: string, series: TwelveDataSeries, weeks: numbe
     medianGapPct: percentile(gapSeries, 0.5),
     p75GapPct: percentile(gapSeries, 0.75),
     p90GapPct: percentile(gapSeries, 0.9),
+    p90DownsideGapPct: percentile(downsideSeries, 0.9),
     maxDownsideGapPct: downsideSeries.length ? Math.max(...downsideSeries) : null,
     typicalWeekendGapPct: percentile(downsideSeries, 0.75),
-    windowStart: observations[0]?.fridayDate ?? null,
+    windowStart: observations[0]?.sessionDate ?? null,
     windowEnd: observations[observations.length - 1]?.nextSessionDate ?? null,
     methodology:
-      'Friday close to the next available trading-session open using Twelve Data daily OHLC; downside gap is max(0, Friday-to-next-session-open return). Typical weekend gap is the 75th percentile of downside observations.',
+      'Last observed US equity session to the next available session when the calendar gap is at least three days. This captures normal weekends and holiday closures. Downside gap is max(0, close-to-next-open return). Typical is P75 downside; conservative is P90 downside; extreme is the maximum observed downside.',
     observations,
   };
 }
@@ -326,7 +368,7 @@ export default async function handler(req: any, res: any) {
     for (const symbol of symbols) unavailable.push({ symbol, reason: 'Twelve Data historical provider is not configured.' });
   } else if (underlyingSymbols.length) {
     const endDate = dateKey(new Date());
-    const startDate = dateKey(addDays(lastCompletedFriday(), -(weeks + 8) * 7));
+    const startDate = dateKey(addDays(new Date(), -(weeks + 12) * 7));
 
     try {
       const series = await fetchTwelveDataSeries(Array.from(new Set(underlyingSymbols)), startDate, endDate, apiKey);
