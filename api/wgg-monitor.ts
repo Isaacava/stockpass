@@ -29,10 +29,13 @@ type WeekendGap = {
   typicalWeekendGapPct: number | null;
   p75GapPct: number | null;
   p90GapPct: number | null;
+  p90DownsideGapPct: number | null;
   maxDownsideGapPct: number | null;
   observations: Array<{
-    fridayDate: string;
+    sessionDate: string;
     nextSessionDate: string;
+    calendarGapDays: number;
+    fridayDate: string | null;
     fridayClose: number;
     nextOpen: number;
     gapPct: number;
@@ -68,12 +71,8 @@ function addDays(date: Date, days: number) {
   return out;
 }
 
-function lastCompletedFriday(today = new Date()) {
-  const day = today.getUTCDay();
-  const daysSinceFriday = day === 5 ? 0 : day > 5 ? day - 5 : day + 2;
-  const friday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
-  friday.setUTCDate(friday.getUTCDate() - daysSinceFriday);
-  return friday;
+function calendarDaysBetween(from: string, to: string) {
+  return Math.round((Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / 86_400_000);
 }
 
 function percentile(values: number[], p: number): number | null {
@@ -120,88 +119,105 @@ async function fetchXStockData(symbols: string[]): Promise<Record<string, XStock
 
 async function fetchHistorical(symbols: string[], weeks = 13): Promise<Record<string, WeekendGap>> {
   if (!TWELVE_DATA_API_KEY || !symbols.length) return {};
-  const start = dateKey(addDays(lastCompletedFriday(), -(weeks + 8) * 7));
+  const normalizedSymbols = [...new Set(symbols)].sort();
+  const start = dateKey(addDays(new Date(), -(weeks + 12) * 7));
   const end = dateKey(new Date());
-  const url = new URL('https://api.twelvedata.com/time_series');
-  url.searchParams.set('symbol', symbols.join(','));
-  url.searchParams.set('interval', '1day');
-  url.searchParams.set('start_date', start);
-  url.searchParams.set('end_date', end);
-  url.searchParams.set('format', 'JSON');
+  const cacheKey = 'td:' + normalizedSymbols.join(',') + ':' + start + ':' + end;
 
-  const response = await fetch(url, {
-    headers: { Accept: 'application/json', Authorization: `apikey ${TWELVE_DATA_API_KEY}` },
-  });
-  const text = await response.text();
-  if (!response.ok) throw new Error(`Twelve Data ${response.status}: ${text.slice(0, 240)}`);
-  const parsed = JSON.parse(text) as Record<string, any>;
+  if (!supabase) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');
+  const { data: cachedRow } = await supabase
+    .from('wgg_market_cache')
+    .select('payload,expires_at')
+    .eq('cache_key', cacheKey)
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle();
 
-  const normalized: Record<string, any> = {};
-  if ('values' in parsed || 'status' in parsed) {
-    const metaSymbol = String(parsed.meta?.symbol || symbols[0]).toUpperCase();
-    normalized[metaSymbol] = parsed;
-  } else {
-    for (const [key, value] of Object.entries(parsed)) {
-      if (value && typeof value === 'object') normalized[key.toUpperCase()] = value;
+  let parsed: Record<string, any> | null = (cachedRow?.payload as Record<string, any> | null) ?? null;
+
+  if (!parsed) {
+    const url = new URL('https://api.twelvedata.com/time_series');
+    url.searchParams.set('symbol', normalizedSymbols.join(','));
+    url.searchParams.set('interval', '1day');
+    url.searchParams.set('start_date', start);
+    url.searchParams.set('end_date', end);
+    url.searchParams.set('format', 'JSON');
+
+    const response = await fetch(url, {
+      headers: { Accept: 'application/json', Authorization: `apikey ${TWELVE_DATA_API_KEY}` },
+    });
+    const text = await response.text();
+    if (!response.ok) throw new Error(`Twelve Data ${response.status}: ${text.slice(0, 240)}`);
+    const raw = JSON.parse(text) as Record<string, any>;
+    parsed = {};
+
+    if ('values' in raw || 'status' in raw) {
+      const metaSymbol = String(raw.meta?.symbol || normalizedSymbols[0]).toUpperCase();
+      parsed[metaSymbol] = raw;
+    } else {
+      for (const [key, value] of Object.entries(raw)) {
+        if (value && typeof value === 'object') parsed[key.toUpperCase()] = value;
+      }
     }
+
+    await supabase.from('wgg_market_cache').upsert({
+      cache_key: cacheKey,
+      provider: 'Twelve Data',
+      payload: parsed,
+      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      updated_at: new Date().toISOString(),
+    });
   }
 
   const out: Record<string, WeekendGap> = {};
-  for (const symbol of symbols) {
-    const series = normalized[symbol];
+  for (const symbol of normalizedSymbols) {
+    const series = parsed[symbol];
     const values: DailyValue[] = (series?.values ?? [])
       .map((row: any) => ({
         date: String(row?.datetime ?? '').slice(0, 10),
         open: finiteNumber(row?.open),
         close: finiteNumber(row?.close),
       }))
-      .filter((row: any) => /^\d{4}-\d{2}-\d{2}$/.test(row.date) && row.open !== null && row.close !== null)
+      .filter((row: any) => /^\\d{4}-\\d{2}-\\d{2}$/.test(row.date) && row.open !== null && row.close !== null)
       .map((row: any) => ({ date: row.date, open: row.open as number, close: row.close as number }))
       .sort((a: DailyValue, b: DailyValue) => a.date.localeCompare(b.date));
 
-    if (!values.length) continue;
-    const map = new Map(values.map((value) => [value.date, value]));
-    const latestFriday = lastCompletedFriday();
-    const earliestFriday = addDays(latestFriday, -(weeks + 8) * 7);
     const observations: WeekendGap['observations'] = [];
-
-    for (let cursor = new Date(earliestFriday); cursor <= latestFriday; cursor = addDays(cursor, 1)) {
-      if (cursor.getUTCDay() !== 5) continue;
-      const fridayDate = dateKey(cursor);
-      const friday = map.get(fridayDate);
-      if (!friday || friday.close <= 0) continue;
-
-      const next = values.find((value) => value.date > fridayDate);
-      if (!next || next.open <= 0) continue;
-
-      const gapPct = ((next.open - friday.close) / friday.close) * 100;
+    for (let index = 0; index < values.length - 1 && observations.length < weeks; index += 1) {
+      const current = values[index];
+      const next = values[index + 1];
+      if (Date.parse(current.date + 'T00:00:00Z') < Date.parse(start + 'T00:00:00Z')) continue;
+      const calendarGapDays = calendarDaysBetween(current.date, next.date);
+      if (calendarGapDays < 3 || current.close <= 0 || next.open <= 0) continue;
+      const gapPct = ((next.open - current.close) / current.close) * 100;
       observations.push({
-        fridayDate,
+        sessionDate: current.date,
         nextSessionDate: next.date,
-        fridayClose: friday.close,
+        calendarGapDays,
+        fridayDate: new Date(current.date + 'T00:00:00Z').getUTCDay() === 5 ? current.date : null,
+        fridayClose: current.close,
         nextOpen: next.open,
         gapPct,
         downsideGapPct: Math.max(0, -gapPct),
       });
-      if (observations.length >= weeks) break;
     }
 
     if (observations.length < Math.max(8, Math.floor(weeks * 0.6))) continue;
-    const allGaps = observations.map((item) => item.gapPct);
+    const gaps = observations.map((item) => item.gapPct);
     const downside = observations.map((item) => item.downsideGapPct);
+
     out[symbol] = {
       underlyingSymbol: symbol,
       sampleCount: observations.length,
       typicalWeekendGapPct: percentile(downside, 0.75),
-      p75GapPct: percentile(allGaps, 0.75),
-      p90GapPct: percentile(allGaps, 0.9),
+      p75GapPct: percentile(gaps, 0.75),
+      p90GapPct: percentile(gaps, 0.9),
+      p90DownsideGapPct: percentile(downside, 0.9),
       maxDownsideGapPct: Math.max(...downside),
       observations,
     };
   }
   return out;
 }
-
 async function fetchEarnings(symbols: string[]): Promise<Record<string, EarningsEvent>> {
   if (!TWELVE_DATA_API_KEY || !symbols.length) return {};
   const today = new Date();
@@ -378,7 +394,7 @@ async function upsertPositionRisk(wallet: string, position: any, stock: any, pri
   return { positionId, alertId: null, riskStatus };
 }
 
-async function syncWallet(wallet: string, runKind: 'manual' | 'friday' | 'position_scan') {
+async function syncWallet(wallet: string, runKind: 'manual' | 'scheduled' | 'position_scan') {
   if (!supabase) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');
   if (!SOLANA_RPC_URL) throw new Error('SOLANA_RPC_URL is not configured.');
 
@@ -594,7 +610,7 @@ export default async function handler(req: any, res: any) {
     const results: unknown[] = [];
     for (const currentWallet of wallets) {
       try {
-        results.push(await syncWallet(currentWallet, 'friday'));
+        results.push(await syncWallet(currentWallet, 'scheduled'));
       } catch (error) {
         results.push({ wallet: currentWallet, error: error instanceof Error ? error.message : 'Wallet monitoring failed.' });
       }
