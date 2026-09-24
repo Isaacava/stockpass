@@ -38,7 +38,10 @@
     "src/lib/wggRisk.ts",
     "src/lib/xstocks.ts",
     "src/vite-env.d.ts",
-    "src/window.d.ts"
+    "src/window.d.ts",
+    "src/WggHome.tsx",
+    "src/lib/wggGap.ts",
+    "src/lib/kaminoActionVerification.ts"
   ],
   "exclude": [
     "src/StockPass*.tsx",
