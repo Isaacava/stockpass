@@ -8,8 +8,10 @@ export type XStockPrice = {
 export type XStockPriceMap = Record<string, XStockPrice>;
 
 export type WeekendGapObservation = {
-  fridayDate: string;
+  sessionDate: string;
   nextSessionDate: string;
+  calendarGapDays: number;
+  fridayDate: string | null;
   fridayClose: number;
   nextOpen: number;
   gapPct: number;
@@ -23,6 +25,7 @@ export type WeekendGapSummary = {
   medianGapPct: number | null;
   p75GapPct: number | null;
   p90GapPct: number | null;
+  p90DownsideGapPct: number | null;
   maxDownsideGapPct: number | null;
   typicalWeekendGapPct: number | null;
   windowStart: string | null;
