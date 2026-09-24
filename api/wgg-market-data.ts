@@ -1,3 +1,4 @@
+import { buildWeekendGapSummary, type DailyOHLC, type WeekendGapSummary } from '../src/lib/wggGap.js';
 const XSTOCKS_BASE = 'https://api.xstocks.fi/api/v2/public';
 const TWELVE_DATA_BASE = 'https://api.twelvedata.com';
 
@@ -31,33 +32,6 @@ type TwelveDataSeries = {
   message?: string;
   meta?: { symbol?: string };
   values?: TwelveDataValue[];
-};
-
-type WeekendGapObservation = {
-  sessionDate: string;
-  nextSessionDate: string;
-  calendarGapDays: number;
-  fridayDate: string | null;
-  fridayClose: number;
-  nextOpen: number;
-  gapPct: number;
-  downsideGapPct: number;
-};
-
-type WeekendGapSummary = {
-  provider: 'Twelve Data';
-  underlyingSymbol: string;
-  sampleCount: number;
-  medianGapPct: number | null;
-  p75GapPct: number | null;
-  p90GapPct: number | null;
-  p90DownsideGapPct: number | null;
-  maxDownsideGapPct: number | null;
-  typicalWeekendGapPct: number | null;
-  windowStart: string | null;
-  windowEnd: string | null;
-  methodology: string;
-  observations: WeekendGapObservation[];
 };
 
 type CacheEntry = { expiresAt: number; value: unknown };
@@ -158,23 +132,6 @@ function addDays(date: Date, days: number): Date {
   return result;
 }
 
-function calendarDaysBetween(from: string, to: string): number {
-  const fromMs = Date.parse(from + 'T00:00:00Z');
-  const toMs = Date.parse(to + 'T00:00:00Z');
-  return Math.round((toMs - fromMs) / 86_400_000);
-}
-
-function percentile(values: number[], p: number): number | null {
-  if (!values.length) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  if (sorted.length === 1) return sorted[0];
-  const index = (sorted.length - 1) * p;
-  const lower = Math.floor(index);
-  const upper = Math.ceil(index);
-  if (lower === upper) return sorted[lower];
-  return sorted[lower] + (sorted[upper] - sorted[lower]) * (index - lower);
-}
-
 async function getSupabaseClient() {
   if (!SUPABASE_SERVICE_ROLE_KEY) return null;
   if (!supabase) {
@@ -261,68 +218,6 @@ async function fetchTwelveDataSeries(symbols: string[], startDate: string, endDa
   return normalized;
 }
 
-function buildSummary(underlying: string, series: TwelveDataSeries, weeks: number): WeekendGapSummary | null {
-  const values = (series.values ?? [])
-    .map((value) => ({
-      date: String(value.datetime ?? '').slice(0, 10),
-      open: finiteNumber(value.open),
-      close: finiteNumber(value.close),
-    }))
-    .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value.date) && value.open !== null && value.close !== null)
-    .sort((a, b) => a.date.localeCompare(b.date));
-
-  if (values.length < 2) return null;
-
-  const earliestDate = addDays(new Date(), -(weeks + 12) * 7);
-  const observations: WeekendGapObservation[] = [];
-
-  for (let index = 0; index < values.length - 1 && observations.length < weeks; index += 1) {
-    const current = values[index];
-    const next = values[index + 1];
-    if (Date.parse(current.date + 'T00:00:00Z') < earliestDate.getTime()) continue;
-
-    const gapDays = calendarDaysBetween(current.date, next.date);
-    // A normal Friday->Monday weekend is 3 calendar days. A Thursday->Monday
-    // closure (or another market holiday) is longer and is handled the same way.
-    if (gapDays < 3) continue;
-    if (current.close === null || current.close <= 0 || next.open === null || next.open <= 0) continue;
-
-    const gapPct = ((next.open - current.close) / current.close) * 100;
-    observations.push({
-      sessionDate: current.date,
-      nextSessionDate: next.date,
-      calendarGapDays: gapDays,
-      fridayDate: new Date(current.date + 'T00:00:00Z').getUTCDay() === 5 ? current.date : null,
-      fridayClose: current.close,
-      nextOpen: next.open,
-      gapPct,
-      downsideGapPct: Math.max(0, -gapPct),
-    });
-  }
-
-  if (observations.length < Math.max(8, Math.floor(weeks * 0.6))) return null;
-
-  const gapSeries = observations.map((item) => item.gapPct);
-  const downsideSeries = observations.map((item) => item.downsideGapPct);
-
-  return {
-    provider: 'Twelve Data',
-    underlyingSymbol: underlying,
-    sampleCount: observations.length,
-    medianGapPct: percentile(gapSeries, 0.5),
-    p75GapPct: percentile(gapSeries, 0.75),
-    p90GapPct: percentile(gapSeries, 0.9),
-    p90DownsideGapPct: percentile(downsideSeries, 0.9),
-    maxDownsideGapPct: downsideSeries.length ? Math.max(...downsideSeries) : null,
-    typicalWeekendGapPct: percentile(downsideSeries, 0.75),
-    windowStart: observations[0]?.sessionDate ?? null,
-    windowEnd: observations[observations.length - 1]?.nextSessionDate ?? null,
-    methodology:
-      'Last observed US equity session to the next available session when the calendar gap is at least three days. This captures normal weekends and holiday closures. Downside gap is max(0, close-to-next-open return). Typical is P75 downside; conservative is P90 downside; extreme is the maximum observed downside.',
-    observations,
-  };
-}
-
 export const config = { runtime: 'nodejs', maxDuration: 30 };
 
 export default async function handler(req: any, res: any) {
@@ -377,7 +272,15 @@ export default async function handler(req: any, res: any) {
       for (const xStockSymbol of symbols) {
         const underlying = underlyingSymbol(xStockSymbol);
         const seriesForSymbol = series[underlying];
-        const summary = seriesForSymbol ? buildSummary(underlying, seriesForSymbol, weeks) : null;
+        const values: DailyOHLC[] = (seriesForSymbol?.values ?? [])
+          .map((value) => ({
+            date: String(value.datetime ?? '').slice(0, 10),
+            open: finiteNumber(value.open),
+            close: finiteNumber(value.close),
+          }))
+          .filter((value): value is DailyOHLC => /^\\d{4}-\\d{2}-\\d{2}$/.test(value.date) && value.open !== null && value.close !== null)
+          .map((value) => ({ date: value.date, open: value.open as number, close: value.close as number }));
+        const summary = buildWeekendGapSummary(underlying, values, weeks);
         if (summary) weekendGaps[xStockSymbol] = summary;
         else unavailable.push({ symbol: xStockSymbol, reason: 'Insufficient historical OHLC observations.' });
       }
