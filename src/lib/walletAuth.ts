@@ -35,6 +35,7 @@ export function clearWalletSession() {
 async function validateSession(wallet: string, current: WalletSessionRecord) {
   const { data, error } = await supabase.functions.invoke('wallet-auth', {
     body: { action: 'validate', wallet },
+    headers: { 'x-client-info': `stockpass stockpass-session=${current.token}` },
   });
   if (error || !data?.wallet || data.wallet !== wallet) return false;
   const expiresAt = Date.parse(String(data.expiresAt ?? ''));
