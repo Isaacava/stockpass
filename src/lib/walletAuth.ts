@@ -88,7 +88,7 @@ export async function refreshWalletSession(wallet: WalletSigner) {
   return authenticateWallet(wallet);
 }
 
-export function walletAuthHeaders(): HeadersInit {
+export function walletAuthHeaders(): Record<string, string> {
   const session = loadWalletSession();
   return session ? { 'x-client-info': `stockpass stockpass-session=${session.token}` } : {};
 }
