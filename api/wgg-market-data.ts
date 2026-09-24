@@ -34,8 +34,10 @@ type TwelveDataSeries = {
 };
 
 type WeekendGapObservation = {
-  fridayDate: string;
+  sessionDate: string;
   nextSessionDate: string;
+  calendarGapDays: number;
+  fridayDate: string | null;
   fridayClose: number;
   nextOpen: number;
   gapPct: number;
