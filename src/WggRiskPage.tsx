@@ -1,7 +1,7 @@
 import { ArrowRight, CheckCircle2, ShieldAlert, ShieldCheck, TrendingDown } from 'lucide-react';
 import type { KaminoXStockPosition } from './lib/kamino';
 import type { XStockPriceMap, WeekendGapMap } from './lib/wggMarketData';
-import { evaluateWeekendRisk } from './lib/wggRisk';
+import { evaluateWeekendRisk, type WeekendRiskProfile } from './lib/wggRisk';
 
 type Row = {
   position: KaminoXStockPosition;
@@ -21,13 +21,15 @@ function Status({ status }: { status: 'safe' | 'watch' | 'flagged' }) {
 }
 
 export default function WggRiskPage({
-  rows, counts, prepareFix, preparing, authenticating,
+  rows, counts, prepareFix, preparing, authenticating, riskProfile, onRiskProfileChange,
 }: {
   rows: Row[];
   counts: { flagged: number; watch: number; safe: number };
   prepareFix: (row: Row, kind: 'deposit' | 'repay') => Promise<void>;
   preparing: boolean;
   authenticating: boolean;
+  riskProfile: WeekendRiskProfile;
+  onRiskProfileChange: (profile: WeekendRiskProfile) => void;
 }) {
   const state = counts.flagged ? 'flagged' : counts.watch ? 'watch' : counts.safe ? 'safe' : 'empty';
   const title = state === 'flagged' ? 'Protection action required' : state === 'watch' ? 'Protection boundary is close' : state === 'safe' ? 'Guard is clear' : 'Guard is waiting for data';
@@ -38,12 +40,29 @@ export default function WggRiskPage({
         <div>
           <div className="sp-eyebrow">Guard / risk engine</div>
           <h1 className="sp-page-title">Weekend Gap Guard</h1>
-          <p className="sp-page-copy">Current LTV, stressed LTV, liquidation boundary and the real weekend-gap scenario for each loaded xStock row.</p>
+          <p className="sp-page-copy">Current LTV, stressed LTV, liquidation boundary and the selected historical downside scenario for each loaded xStock row.</p>
         </div>
         {state !== 'empty' && <Status status={state} />}
       </div>
 
       <section className={'sp-risk-summary ' + (state === 'flagged' ? 'sp-next-danger' : state === 'watch' ? 'sp-next-watch' : state === 'safe' ? 'sp-next-safe' : '')}>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {([
+            ['p75', 'Typical', '75th percentile downside'],
+            ['p90', 'Conservative', '90th percentile downside'],
+            ['max', 'Extreme', 'Maximum observed downside'],
+          ] as const).map(([value, label, caption]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onRiskProfileChange(value)}
+              className={'rounded-xl border px-3 py-2.5 text-left transition ' + (riskProfile === value ? 'border-ink bg-ink text-white' : 'border-line bg-white text-ink')}
+            >
+              <div className="text-[10px] font-extrabold">{label}</div>
+              <div className={'mt-0.5 text-[8px] leading-4 ' + (riskProfile === value ? 'text-white/70' : 'text-mute')}>{caption}</div>
+            </button>
+          ))}
+        </div>
         <div>
           <div className="sp-eyebrow">Guard status</div>
           <h2 className="mt-1.5 text-[18px] font-bold text-ink">{title}</h2>
