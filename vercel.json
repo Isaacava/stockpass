@@ -13,8 +13,12 @@
   },
   "crons": [
     {
-      "path": "/api/wgg-monitor",
-      "schedule": "0 21 * * 5"
+      "path": "/api/wgg-monitor?window=thursday",
+      "schedule": "0 16 * * 4"
+    },
+    {
+      "path": "/api/wgg-monitor?window=friday",
+      "schedule": "0 16 * * 5"
     }
   ],
   "rewrites": [
