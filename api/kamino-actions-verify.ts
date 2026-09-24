@@ -1,3 +1,8 @@
+import {
+  actualInstructionFingerprint,
+  expectedInstructionFingerprint,
+  verifyPreparedKaminoInstructionSet,
+} from '../src/lib/kaminoActionVerification.js';
 const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 
 import { discoverKaminoXStockPositions } from '../src/lib/kamino';
@@ -9,53 +14,6 @@ const KAMINO_PROGRAM_ID = 'KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD';
 
 function json(res: any, body: unknown, status = 200) {
   res.status(status).setHeader('Cache-Control', 'no-store').json(body);
-}
-
-function base58ToBase64(value: string) {
-  const alphabet = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
-  let decodedNumber = 0n;
-  for (const char of value) {
-    const index = alphabet.indexOf(char);
-    if (index < 0) throw new Error('Invalid base58 instruction data.');
-    decodedNumber = decodedNumber * 58n + BigInt(index);
-  }
-
-  const bytes: number[] = [];
-  while (decodedNumber > 0n) {
-    bytes.unshift(Number(decodedNumber & 255n));
-    decodedNumber >>= 8n;
-  }
-
-  let leadingZeros = 0;
-  for (let i = 0; i < value.length && value[i] === '1'; i += 1) leadingZeros += 1;
-  if (leadingZeros) bytes.unshift(...Array.from({ length: leadingZeros }, () => 0));
-
-  return Buffer.from(bytes).toString('base64');
-}
-
-function actualInstructionFingerprint(instruction: any) {
-  const programId = String(instruction.programId || '');
-  const accounts = Array.isArray(instruction.accounts)
-    ? instruction.accounts.map((account: any) => typeof account === 'string' ? account : String(account?.pubkey || account)).join(',')
-    : '';
-  const data = typeof instruction.data === 'string' ? base58ToBase64(instruction.data) : '';
-  return { programId, accounts, data };
-}
-
-function expectedInstructionFingerprint(instruction: any) {
-  return {
-    programId: String(instruction.programAddress || ''),
-    accounts: Array.isArray(instruction.accounts)
-      ? instruction.accounts.map((account: any) => String(account.address || '')).join(',')
-      : '',
-    data: String(instruction.data || ''),
-  };
-}
-
-function fingerprintsEqual(actual: any, expected: any) {
-  return actual.programId === expected.programId
-    && actual.accounts === expected.accounts
-    && actual.data === expected.data;
 }
 
 async function loadConfirmedTransaction(connection: any, signature: string) {
@@ -159,10 +117,8 @@ export default async function handler(req: any, res: any) {
       return json(res, { error: 'Confirmed transaction does not match the prepared Kamino instruction set.' }, 422);
     }
 
-    for (let index = 0; index < preparedInstructions.length; index += 1) {
-      if (!fingerprintsEqual(actualKaminoInstructions[index], preparedInstructions[index])) {
-        return json(res, { error: 'Confirmed transaction differs from the instructions StockPass prepared.' }, 422);
-      }
+    if (!verifyPreparedKaminoInstructionSet(actualKaminoInstructions, preparedInstructions)) {
+      return json(res, { error: 'Confirmed transaction differs from the instructions StockPass prepared.' }, 422);
     }
 
     const updateResult = await supabase
