@@ -278,7 +278,7 @@ export default async function handler(req: any, res: any) {
             open: finiteNumber(value.open),
             close: finiteNumber(value.close),
           }))
-          .filter((value): value is DailyOHLC => /^\\d{4}-\\d{2}-\\d{2}$/.test(value.date) && value.open !== null && value.close !== null)
+          .filter((value): value is DailyOHLC => /^\d{4}-\d{2}-\d{2}$/.test(value.date) && value.open !== null && value.close !== null)
           .map((value) => ({ date: value.date, open: value.open as number, close: value.close as number }));
         const summary = buildWeekendGapSummary(underlying, values, weeks);
         if (summary) weekendGaps[xStockSymbol] = summary;
