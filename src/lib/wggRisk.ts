@@ -1,3 +1,5 @@
+export type WeekendRiskProfile = 'p75' | 'p90' | 'max';
+
 export type WeekendRiskInput = {
   currentLtvPct: number;
   liquidationLtvPct: number;
@@ -7,6 +9,7 @@ export type WeekendRiskInput = {
 };
 
 export type WeekendRiskResult = {
+  profile: WeekendRiskProfile;
   adjustedGapPct: number;
   stressedLtvPct: number;
   liquidationDistancePct: number;
@@ -14,40 +17,48 @@ export type WeekendRiskResult = {
   status: 'safe' | 'watch' | 'flagged';
 };
 
+export type WeekendGapScenario = {
+  typicalWeekendGapPct?: number | null;
+  p90GapPct?: number | null;
+  maxDownsideGapPct?: number | null;
+};
+
+export function selectWeekendGapPct(
+  gap: WeekendGapScenario,
+  profile: WeekendRiskProfile = 'p75',
+): number | null {
+  if (profile === 'max') return gap.maxDownsideGapPct ?? null;
+  if (profile === 'p90') return gap.p90GapPct == null ? (gap.typicalWeekendGapPct ?? null) : Math.max(0, -gap.p90GapPct);
+  return gap.typicalWeekendGapPct ?? null;
+}
+
 /**
  * Weekend stress test for an xStock-backed Kamino obligation.
  *
  * The historical downside gap is a collateral-price shock, so WGG first
- * stresses the position's LTV rather than comparing unlike units
- * (price-percent vs LTV percentage points).
- *
- * stressed LTV = current LTV / (1 - downside gap)
+ * stresses the position's LTV rather than comparing unlike units.
  */
-export function evaluateWeekendRisk(input: WeekendRiskInput): WeekendRiskResult {
+export function evaluateWeekendRisk(input: WeekendRiskInput, profile: WeekendRiskProfile = 'p75'): WeekendRiskResult {
   const earningsMultiplier = input.earningsRisk ? Math.max(1, input.earningsMultiplier ?? 1.25) : 1;
   const adjustedGapPct = Math.max(0, input.typicalWeekendGapPct) * earningsMultiplier;
   const currentLtvPct = Math.max(0, input.currentLtvPct);
   const liquidationLtvPct = Math.max(0, input.liquidationLtvPct);
 
-  // A gap at/above 100% is not a usable linear price scenario; cap the
-  // denominator so the UI fails toward a clearly stressed state.
   const remainingCollateralFactor = Math.max(0.01, 1 - adjustedGapPct / 100);
   const stressedLtvPct = currentLtvPct / remainingCollateralFactor;
   const liquidationDistancePct = Math.max(0, liquidationLtvPct - stressedLtvPct);
   const deficitPct = Math.max(0, stressedLtvPct - liquidationLtvPct);
 
   if (deficitPct > 0) {
-    return { adjustedGapPct, stressedLtvPct, liquidationDistancePct, deficitPct, status: 'flagged' };
+    return { profile, adjustedGapPct, stressedLtvPct, liquidationDistancePct, deficitPct, status: 'flagged' };
   }
 
-  // Keep a visible watch band when the stressed scenario leaves only a small
-  // amount of liquidation distance.
   const watchDistance = Math.max(1.5, liquidationLtvPct * 0.02);
   if (liquidationDistancePct <= watchDistance) {
-    return { adjustedGapPct, stressedLtvPct, liquidationDistancePct, deficitPct: 0, status: 'watch' };
+    return { profile, adjustedGapPct, stressedLtvPct, liquidationDistancePct, deficitPct: 0, status: 'watch' };
   }
 
-  return { adjustedGapPct, stressedLtvPct, liquidationDistancePct, deficitPct: 0, status: 'safe' };
+  return { profile, adjustedGapPct, stressedLtvPct, liquidationDistancePct, deficitPct: 0, status: 'safe' };
 }
 
 export function calculateRepayUsdForTargetLtv(
