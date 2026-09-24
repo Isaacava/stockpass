@@ -25,7 +25,7 @@ const admin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
 
 function normalizeWallet(wallet: string) {
