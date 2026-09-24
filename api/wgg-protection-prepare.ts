@@ -1,8 +1,10 @@
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://sfbxpscbevnmoppgkjcr.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY =
   process.env.SUPABASE_PUBLISHABLE_KEY ||
   process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   'sb_publishable_eCgd2QEH5mUlEK5vHIonyw_v0E8QFrp';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const MAINNET_RPC = process.env.SOLANA_RPC_URL || '';
 const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 
@@ -202,7 +204,41 @@ export default async function handler(req: any, res: any) {
       KaminoAction.actionToIxs(action) as unknown as PreparedInstruction[],
     );
 
+    if (!SUPABASE_SERVICE_ROLE_KEY) {
+      return json(res, { error: 'SUPABASE_SERVICE_ROLE_KEY is not configured.' }, 503);
+    }
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: actionRow, error: actionInsertError } = await admin
+      .from('wgg_platform_actions')
+      .insert({
+        wallet,
+        action_type: kind,
+        obligation_address: obligationAddress,
+        reserve_address: reserveAddress,
+        amount_base_units: preparedAmountBaseUnits,
+        status: 'prepared',
+        kamino_program_id: 'KLend2g3cP87fffoy8q1mQqGKjrxjC8boSyAYavgmjD',
+        metadata: {
+          source: 'wgg-protection',
+          preparedInstructions: instructions,
+          lookupTables: action.luts.map(String),
+          targetLtvPct: kind === 'repay' ? targetLtvPct : null,
+        },
+      })
+      .select('id')
+      .single();
+
+    if (actionInsertError || !actionRow?.id) {
+      console.error('wgg-protection-prepare action ledger insert failed', actionInsertError);
+      return json(res, { error: 'Could not create the server verification record for this action.' }, 502);
+    }
+
     return json(res, {
+      actionId: actionRow.id,
       kind,
       wallet,
       obligationAddress,
