@@ -2,6 +2,7 @@ import {
   actualInstructionFingerprint,
   expectedInstructionFingerprint,
   verifyPreparedKaminoInstructionSet,
+  type TransactionFingerprint,
 } from '../src/lib/kaminoActionVerification.js';
 const KAMINO_MAIN_MARKET = '7u3HeHxYDLhnCoErrtycNokbQYbWGzLs6JSDqGAv5PfF';
 
@@ -99,7 +100,7 @@ export default async function handler(req: any, res: any) {
     const requiredSignerCount = Number(message.header?.numRequiredSignatures ?? 0);
     const signerPresent = accountKeys.slice(0, requiredSignerCount).includes(wallet);
 
-    const actualInstructions = (message.instructions ?? []).map((instruction: any) => actualInstructionFingerprint({
+    const actualInstructions: TransactionFingerprint[] = (message.instructions ?? []).map((instruction: any) => actualInstructionFingerprint({
       programId: accountKeys[Number(instruction.programIdIndex)],
       accounts: (instruction.accounts ?? []).map((index: number) => accountKeys[index]),
       data: String(instruction.data ?? ''),
