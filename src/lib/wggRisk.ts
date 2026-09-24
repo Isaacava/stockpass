@@ -19,7 +19,7 @@ export type WeekendRiskResult = {
 
 export type WeekendGapScenario = {
   typicalWeekendGapPct?: number | null;
-  p90GapPct?: number | null;
+  p90DownsideGapPct?: number | null;
   maxDownsideGapPct?: number | null;
 };
 
@@ -27,15 +27,15 @@ export function selectWeekendGapPct(
   gap: WeekendGapScenario,
   profile: WeekendRiskProfile = 'p75',
 ): number | null {
-  if (profile === 'max') return gap.maxDownsideGapPct ?? null;
-  if (profile === 'p90') return gap.p90GapPct == null ? (gap.typicalWeekendGapPct ?? null) : Math.max(0, -gap.p90GapPct);
+  if (profile === 'max') return gap.maxDownsideGapPct ?? gap.typicalWeekendGapPct ?? null;
+  if (profile === 'p90') return gap.p90DownsideGapPct ?? gap.typicalWeekendGapPct ?? null;
   return gap.typicalWeekendGapPct ?? null;
 }
 
 /**
  * Weekend stress test for an xStock-backed Kamino obligation.
  *
- * The historical downside gap is a collateral-price shock, so WGG first
+ * The selected historical downside gap is a collateral-price shock, so WGG
  * stresses the position's LTV rather than comparing unlike units.
  */
 export function evaluateWeekendRisk(input: WeekendRiskInput, profile: WeekendRiskProfile = 'p75'): WeekendRiskResult {
