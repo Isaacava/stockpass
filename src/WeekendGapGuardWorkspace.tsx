@@ -17,7 +17,7 @@ import WggPositionsPage from './WggPositionsPage';
 import WggRiskPage from './WggRiskPage';
 import WggActionsPage from './WggActionsPage';
 import WggMonitoringPage from './WggMonitoringPage';
-import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk } from './lib/wggRisk';
+import { calculateCollateralUsdForTargetLtv, evaluateWeekendRisk, selectWeekendGapPct, type WeekendRiskProfile } from './lib/wggRisk';
 import { fetchWggMarketData, type XStockPriceMap, type WeekendGapMap } from './lib/wggMarketData';
 import { clearWalletSession, refreshWalletSession } from './lib/walletAuth';
 import { readWalletSessionToken } from './lib/walletSession';
@@ -82,15 +82,20 @@ export default function WeekendGapGuardWorkspace() {
   const [authStatus, setAuthStatus] = useState<'signed_out' | 'authenticating' | 'authenticated' | 'error'>('signed_out');
   const [authError, setAuthError] = useState('');
   const [route, setRoute] = useState(() => window.location.pathname || '/');
+  const [riskProfile, setRiskProfile] = useState<WeekendRiskProfile>(() => {
+    const saved = localStorage.getItem('stockpass.wgg.risk-profile');
+    return saved === 'p90' || saved === 'max' ? saved : 'p75';
+  });
 
   const rows = useMemo<Row[]>(() => positions.flatMap((position) => position.xStocks.map((stock) => {
     const symbol = stock.symbol.replace(/x$/i, '');
     const gap = weekendGaps[stock.symbol];
-    const risk = position.ltvPct != null && position.liquidationLtvPct != null && gap?.typicalWeekendGapPct != null
-      ? evaluateWeekendRisk({ currentLtvPct: position.ltvPct, liquidationLtvPct: position.liquidationLtvPct, typicalWeekendGapPct: gap.typicalWeekendGapPct })
+    const scenarioGap = gap ? selectWeekendGapPct(gap, riskProfile) : null;
+    const risk = position.ltvPct != null && position.liquidationLtvPct != null && scenarioGap != null
+      ? evaluateWeekendRisk({ currentLtvPct: position.ltvPct, liquidationLtvPct: position.liquidationLtvPct, typicalWeekendGapPct: scenarioGap }, riskProfile)
       : null;
     return { position, stock, symbol, gap, risk, price: marketPrices[stock.symbol] };
-  })), [positions, weekendGaps, marketPrices]);
+  })), [positions, weekendGaps, marketPrices, riskProfile]);
 
   const counts = rows.reduce((acc, row) => {
     if (row.risk?.status === 'flagged') acc.flagged += 1;
@@ -119,6 +124,10 @@ export default function WeekendGapGuardWorkspace() {
       setAuthError(cause instanceof Error ? cause.message : 'Wallet authentication failed.');
     }
   }
+
+  useEffect(() => {
+    localStorage.setItem('stockpass.wgg.risk-profile', riskProfile);
+  }, [riskProfile]);
 
   useEffect(() => {
     if (!isConnected || !address) {
@@ -185,8 +194,8 @@ export default function WeekendGapGuardWorkspace() {
 
   async function prepareFix(row: Row, kind: 'deposit' | 'repay') {
     if (!address || !row.gap || row.position.ltvPct == null || row.position.liquidationLtvPct == null) return;
-    const typicalGap = row.gap.typicalWeekendGapPct ?? 0;
-    const risk = evaluateWeekendRisk({ currentLtvPct: row.position.ltvPct, liquidationLtvPct: row.position.liquidationLtvPct, typicalWeekendGapPct: typicalGap });
+    const scenarioGap = selectWeekendGapPct(row.gap, riskProfile) ?? 0;
+    const risk = evaluateWeekendRisk({ currentLtvPct: row.position.ltvPct, liquidationLtvPct: row.position.liquidationLtvPct, typicalWeekendGapPct: scenarioGap }, riskProfile);
     if (risk.status !== 'flagged') return;
     const remainingCollateralFactor = Math.max(0.01, 1 - risk.adjustedGapPct / 100);
     const targetLtvPct = Math.max(1, row.position.liquidationLtvPct * remainingCollateralFactor * 0.98);
@@ -421,7 +430,17 @@ export default function WeekendGapGuardWorkspace() {
           />
         )}
         {page === 'positions' && <WggPositionsPage positions={positions} rows={rows} loading={loading} lastLoaded={lastLoaded} scan={scan} />}
-        {page === 'risk' && <WggRiskPage rows={rows} counts={counts} prepareFix={prepareFix} preparing={preparing} authenticating={authenticating} />}
+        {page === 'risk' && (
+          <WggRiskPage
+            rows={rows}
+            counts={counts}
+            prepareFix={prepareFix}
+            preparing={preparing}
+            authenticating={authenticating}
+            riskProfile={riskProfile}
+            onRiskProfileChange={setRiskProfile}
+          />
+        )}
         {page === 'actions' && <WggActionsPage address={address ?? ''} walletProvider={walletProvider ?? null} positions={positions} onCompleted={scan} />}
         {page === 'monitoring' && <WggMonitoringPage address={address ?? ''} />}
 
