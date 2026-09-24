@@ -1,0 +1,109 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&display=swap");
+
+.wgh {
+  --bg: #fbfbfd;
+  --ink: #14161f;
+  --muted: #566074;
+  --line: #e2e5ee;
+  --panel: #f1f3f9;
+  --safe: #12805c;
+  --safe-bg: #e2f5ed;
+  --watch: #a86a00;
+  --watch-bg: #fdf0d5;
+  --flag: #c22f3d;
+  --flag-bg: #fce4e6;
+  --sol: linear-gradient(120deg, #9945ff, #14f195);
+
+  font-family: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.55;
+  min-height: 100%;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
+}
+.wgh *, .wgh *::before, .wgh *::after { box-sizing: border-box; }
+.wgh h1, .wgh h2, .wgh h3, .wgh p, .wgh ul, .wgh ol, .wgh dl, .wgh dd, .wgh figure { margin: 0; padding: 0; }
+
+.wgh-bar, .wgh-hero, .wgh-section, .wgh-final, .wgh-foot {
+  width: 100%;
+  max-width: 1040px;
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+
+/* header */
+.wgh-bar { display: flex; align-items: center; justify-content: space-between; padding-block: 16px; }
+.wgh-brand { display: flex; align-items: center; gap: 10px; font-weight: 800; color: var(--ink); text-decoration: none; }
+.wgh-mark { width: 22px; height: 22px; border-radius: 7px; background: var(--sol); }
+
+/* buttons */
+.wgh-btn {
+  font: inherit; font-weight: 700; font-size: 15px;
+  min-height: 44px; padding: 0 20px; border-radius: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  cursor: pointer; text-decoration: none; border: 1px solid transparent;
+}
+.wgh-btn--primary { background: var(--sol); color: #0d0f16; }
+.wgh-btn--ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.wgh-btn:hover { filter: brightness(0.97); }
+.wgh-btn:focus-visible, .wgh-brand:focus-visible { outline: 3px solid #6b3fd4; outline-offset: 2px; }
+
+/* hero */
+.wgh-hero { display: grid; gap: 32px; padding-block: 28px 56px; }
+.wgh h1 { font-size: clamp(2.1rem, 7vw, 3.6rem); line-height: 1.05; letter-spacing: -0.03em; font-weight: 800; max-width: 16ch; }
+.wgh-lede { margin-top: 18px; font-size: 1.05rem; color: var(--muted); max-width: 52ch; }
+.wgh-cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.wgh-note { margin-top: 14px; font-size: 0.85rem; color: var(--muted); }
+
+/* the one memorable element: the weekend-gap track */
+.wgh-figure { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 20px; }
+.wgh-days { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; font-size: 0.78rem; font-weight: 700; color: var(--muted); }
+.wgh-days span:nth-child(2) { text-align: center; border-bottom: 2px dashed var(--line); padding-bottom: 4px; }
+.wgh-track { display: flex; height: 56px; margin-top: 12px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: #fff; }
+.wgh-buffer, .wgh-gap { display: flex; align-items: center; padding-inline: 12px; font-size: 0.8rem; font-weight: 700; white-space: nowrap; overflow: hidden; }
+.wgh-buffer { flex: 1 1 62%; background: var(--safe-bg); color: var(--safe); }
+.wgh-gap { flex: 0 0 38%; background: var(--flag-bg); color: var(--flag); justify-content: flex-end; }
+.wgh-states { display: flex; gap: 8px; margin-top: 14px; }
+.wgh-pill { font-size: 0.78rem; font-weight: 700; padding: 4px 12px; border-radius: 999px; }
+.wgh-pill--safe { background: var(--safe-bg); color: var(--safe); }
+.wgh-pill--watch { background: var(--watch-bg); color: var(--watch); }
+.wgh-pill--flag { background: var(--flag-bg); color: var(--flag); }
+.wgh figcaption { margin-top: 14px; font-size: 0.85rem; color: var(--muted); }
+
+/* sections */
+.wgh-section { padding-block: 44px; border-top: 1px solid var(--line); }
+.wgh h2 { font-size: clamp(1.4rem, 4vw, 2rem); letter-spacing: -0.02em; line-height: 1.15; font-weight: 800; }
+.wgh-section > p, .wgh-split > div > p { margin-top: 12px; color: var(--muted); max-width: 52ch; }
+
+.wgh-steps { list-style: none; display: grid; gap: 28px; margin-top: 28px; }
+.wgh-steps li { display: grid; grid-template-columns: 36px 1fr; column-gap: 14px; }
+.wgh-step-n { grid-row: span 2; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; background: var(--ink); color: #fff; }
+.wgh h3 { font-size: 1.1rem; font-weight: 800; }
+.wgh-steps p { color: var(--muted); margin-top: 4px; max-width: 56ch; }
+
+.wgh-split { display: grid; gap: 24px; }
+.wgh-sources { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.wgh-sources > div { padding: 14px 18px; background: #fff; }
+.wgh-sources > div + div { border-top: 1px solid var(--line); }
+.wgh-sources dt { font-weight: 800; }
+.wgh-sources dd { color: var(--muted); font-size: 0.95rem; }
+
+.wgh-never { list-style: none; display: grid; gap: 10px; }
+.wgh-never li { padding: 12px 16px 12px 44px; position: relative; background: #fff; border: 1px solid var(--line); border-radius: 12px; font-weight: 500; }
+.wgh-never li::before { content: ""; position: absolute; left: 16px; top: 50%; width: 14px; height: 2px; background: var(--flag); transform: translateY(-50%); }
+
+.wgh-monitor > p { max-width: 62ch; }
+
+.wgh-final { padding-block: 56px; border-top: 1px solid var(--line); display: grid; justify-items: start; gap: 20px; }
+.wgh-foot { display: grid; gap: 4px; padding-block: 24px 40px; font-size: 0.82rem; color: var(--muted); border-top: 1px solid var(--line); }
+
+@media (min-width: 820px) {
+  .wgh-bar, .wgh-hero, .wgh-section, .wgh-final, .wgh-foot { padding-inline: 32px; }
+  .wgh-hero { grid-template-columns: 1.1fr 0.9fr; align-items: center; padding-block: 64px 88px; }
+  .wgh-steps { grid-template-columns: repeat(3, 1fr); gap: 32px; }
+  .wgh-steps li { display: block; }
+  .wgh-step-n { margin-bottom: 12px; }
+  .wgh-split { grid-template-columns: 0.8fr 1.2fr; gap: 56px; }
+}
