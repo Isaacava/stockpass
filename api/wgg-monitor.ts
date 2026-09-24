@@ -212,7 +212,7 @@ function cronAuthorized(req: any) {
   return header === `Bearer ${CRON_SECRET}`;
 }
 
-async function upsertPositionRisk(wallet: string, position: any, stock: any, price: XStockPrice | undefined, gap: WeekendGap | undefined, earningsEvent: EarningsEvent | null, runId: string) {
+async function upsertPositionRisk(wallet: string, position: any, stock: any, price: XStockPrice | undefined, gap: WeekendGapSummary | undefined, earningsEvent: EarningsEvent | null, runId: string) {
   if (!supabase) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured.');
 
   const previous = await supabase
