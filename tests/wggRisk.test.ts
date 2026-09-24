@@ -15,7 +15,7 @@ test('P75, P90 and max profiles select the intended downside scenario', () => {
 
 test('risk engine keeps safe/watch/flagged behavior deterministic', () => {
   const safe = evaluateWeekendRisk({ currentLtvPct: 50, liquidationLtvPct: 70, typicalWeekendGapPct: 5 }, 'p75');
-  const watch = evaluateWeekendRisk({ currentLtvPct: 65, liquidationLtvPct: 70, typicalWeekendGapPct: 5 }, 'p75');
+  const watch = evaluateWeekendRisk({ currentLtvPct: 65.5, liquidationLtvPct: 70, typicalWeekendGapPct: 5 }, 'p75');
   const flagged = evaluateWeekendRisk({ currentLtvPct: 70, liquidationLtvPct: 70, typicalWeekendGapPct: 5 }, 'p75');
 
   assert.equal(safe.status, 'safe');
