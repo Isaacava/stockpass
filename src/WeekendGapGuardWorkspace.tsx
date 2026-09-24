@@ -38,6 +38,7 @@ type PreparedInstruction = {
 };
 
 type Prepared = {
+  actionId: string;
   kind: 'deposit' | 'repay';
   symbol: string;
   amountBaseUnits: string;
@@ -239,12 +240,14 @@ export default function WeekendGapGuardWorkspace() {
         }),
       });
       const text = await response.text();
-      let data: { error?: string; instructions?: PreparedInstruction[]; lookupTables?: string[]; amountBaseUnits?: string } | null = null;
+      let data: { error?: string; actionId?: string; instructions?: PreparedInstruction[]; lookupTables?: string[]; amountBaseUnits?: string } | null = null;
       try { data = text ? JSON.parse(text) : null; } catch { data = null; }
       if (!response.ok) throw new Error(data?.error ?? (text ? text.slice(0, 240) : 'Protection preparation failed.'));
+      if (!data?.actionId) throw new Error('Protection service returned no verification record.');
       if (!data?.instructions?.length) throw new Error('Protection service returned no instructions.');
       if (kind === 'repay' && !data.amountBaseUnits) throw new Error('Protection service returned no computed repay amount.');
       setPrepared({
+        actionId: data.actionId,
         kind,
         symbol: kind === 'repay' ? (row.position.debts[0]?.mint ?? 'Debt') : row.symbol,
         amountBaseUnits: data.amountBaseUnits ?? amountBaseUnits,
@@ -291,6 +294,19 @@ export default function WeekendGapGuardWorkspace() {
       const signed = await walletProvider.signTransaction(transaction);
       const txSignature = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: false, maxRetries: 2 });
       await connection.confirmTransaction({ signature: txSignature, ...latest }, 'confirmed');
+
+      const verifyResponse = await fetch('/api/kamino-actions-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...walletAuthHeaders() },
+        body: JSON.stringify({ wallet: address, actionId: prepared.actionId, signature: txSignature }),
+      });
+      const verifyText = await verifyResponse.text();
+      let verifyData: { error?: string; verified?: boolean } | null = null;
+      try { verifyData = verifyText ? JSON.parse(verifyText) : null; } catch { verifyData = null; }
+      if (!verifyResponse.ok || verifyData?.verified !== true) {
+        throw new Error(verifyData?.error ?? 'Transaction confirmed, but independent Kamino verification failed.');
+      }
+
       setSignature(txSignature);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Wallet signing or transaction submission failed.');
